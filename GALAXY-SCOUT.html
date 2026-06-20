@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GALAXY // 🔵 SCOUT</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --scout:#4AB3FF;--scout-dim:rgba(74,179,255,0.12);
+  --gold:#FFD700;--green:#00FF88;--red:#FF3355;
+  --amber:#FFAA00;--silver:#C0C8D8;
+  --bg:#010208;--panel:rgba(10,15,30,0.9);--border:rgba(74,179,255,0.15);
+}
+body{background:var(--bg);color:var(--silver);font-family:'Share Tech Mono',monospace;min-height:100vh;padding:20px}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border:1px solid var(--border);border-radius:8px;margin-bottom:20px;background:var(--panel)}
+.logo{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:4px;color:rgba(192,200,216,0.4)}
+.logo span{color:var(--scout);font-size:18px;font-weight:900;display:block;letter-spacing:6px}
+#status-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);display:inline-block;margin-right:8px}
+#status-text{font-size:10px;letter-spacing:2px;color:var(--amber)}
+
+.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:20px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px 8px;text-align:center}
+.stat-card .val{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;display:block}
+.stat-card .lbl{font-size:7px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px;display:block}
+
+.controls{display:flex;flex-direction:column;gap:12px;margin-bottom:20px}
+.input-group{display:flex;flex-direction:column;gap:4px;position:relative}
+label{font-size:9px;letter-spacing:2px;color:var(--scout);text-transform:uppercase}
+input,select{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:12px 16px;color:var(--silver);font-family:'Share Tech Mono',monospace;font-size:13px;outline:none;transition:border-color 0.2s;width:100%}
+input:focus,select:focus{border-color:var(--scout)}
+select option{background:#0a0f1e}
+
+.autocomplete-list{position:absolute;top:100%;left:0;right:0;z-index:100;background:#0a0f1e;border:1px solid var(--scout);border-top:none;border-radius:0 0 4px 4px;max-height:200px;overflow-y:auto;display:none}
+.autocomplete-list.open{display:block}
+.autocomplete-item{padding:10px 16px;font-size:12px;cursor:pointer;color:var(--silver);transition:background 0.15s;border-bottom:1px solid rgba(74,179,255,0.06)}
+.autocomplete-item:hover,.autocomplete-item.active{background:rgba(74,179,255,0.1);color:var(--scout)}
+
+.btn-row{display:grid;grid-template-columns:1fr auto;gap:10px}
+.scan-btn{padding:14px;background:transparent;border:1px solid var(--green);border-radius:4px;color:var(--green);font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:3px;cursor:pointer;transition:all 0.2s}
+.scan-btn:hover{background:rgba(0,255,136,0.1);box-shadow:0 0 16px rgba(0,255,136,0.3)}
+.scan-btn:disabled{opacity:0.4;cursor:not-allowed}
+.stop-btn{padding:14px 20px;background:transparent;border:1px solid var(--red);border-radius:4px;color:var(--red);font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:2px;cursor:pointer;transition:all 0.2s}
+.stop-btn:hover{background:rgba(255,51,85,0.1)}
+.stop-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+#progress-wrap{margin-bottom:20px;display:none}
+#progress-label{font-size:9px;color:var(--scout);letter-spacing:1px;margin-bottom:6px}
+#progress-bar-bg{background:rgba(74,179,255,0.1);border-radius:2px;height:3px;overflow:hidden}
+#progress-bar-fill{height:100%;background:var(--scout);border-radius:2px;width:0%;transition:width 0.3s;box-shadow:0 0 8px var(--scout)}
+
+#log{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:20px;height:80px;overflow-y:auto;font-size:9px}
+.log-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.log-line.info{color:var(--scout)}.log-line.success{color:var(--green)}.log-line.warn{color:var(--amber)}.log-line.error{color:var(--red)}
+
+/* TABS */
+.tab-bar{display:flex;gap:0;margin-bottom:0;border-bottom:1px solid var(--border)}
+.tab{padding:10px 16px;font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;cursor:pointer;color:rgba(192,200,216,0.4);border-bottom:2px solid transparent;transition:all 0.2s}
+.tab.active{color:var(--scout);border-bottom-color:var(--scout)}
+.tab.bin-tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+
+.table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:0 0 6px 6px;overflow:hidden;margin-bottom:20px}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
+.table-header h2{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--scout)}
+.table-header h2.bin{color:var(--amber)}
+.export-btn{padding:5px 14px;background:transparent;border:1px solid var(--gold);border-radius:3px;color:var(--gold);font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;cursor:pointer;transition:all 0.2s}
+.export-btn:hover{background:rgba(255,215,0,0.1)}
+
+table{width:100%;border-collapse:collapse;font-size:10px}
+th{text-align:left;padding:8px 12px;font-size:7px;letter-spacing:2px;color:rgba(192,200,216,0.4);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:hover td{background:rgba(74,179,255,0.03)}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:7px;letter-spacing:1px;border:1px solid}
+.badge.hot{color:var(--amber);border-color:var(--amber)}
+.badge.warm{color:var(--scout);border-color:var(--scout)}
+.badge.cold{color:rgba(192,200,216,0.4);border-color:rgba(192,200,216,0.2)}
+.badge.email-yes{color:var(--green);border-color:var(--green)}
+.badge.email-no{color:rgba(192,200,216,0.3);border-color:rgba(192,200,216,0.1)}
+.badge.sentinel{color:var(--amber);border-color:var(--amber)}
+.empty-state{text-align:center;padding:40px 20px;color:rgba(192,200,216,0.3);font-size:11px;letter-spacing:2px}
+
+/* BIN */
+.bin-note{font-size:9px;color:rgba(255,170,0,0.6);padding:10px 16px;border-bottom:1px solid var(--border);letter-spacing:1px}
+
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:rgba(74,179,255,0.3);border-radius:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center;gap:12px">
+    <button onclick="window.location.href='GALAXY.html'" style="background:transparent;border:1px solid rgba(74,179,255,0.3);border-radius:4px;color:#4AB3FF;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;padding:6px 12px;cursor:pointer">← GALAXY</button>
+    <div class="logo">GALAXY SYSTEM<span>🔵 SCOUT</span></div>
+  </div>
+  <div><span id="status-dot"></span><span id="status-text">STANDING BY</span></div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-card"><span class="val" id="stat-total" style="color:var(--gold)">0</span><span class="lbl">FOUND</span></div>
+  <div class="stat-card"><span class="val" id="stat-emails" style="color:var(--green)">0</span><span class="lbl">EMAILS</span></div>
+  <div class="stat-card"><span class="val" id="stat-sites" style="color:var(--scout)">0</span><span class="lbl">WEBSITES</span></div>
+  <div class="stat-card"><span class="val" id="stat-hot" style="color:var(--amber)">0</span><span class="lbl">HOT</span></div>
+  <div class="stat-card"><span class="val" id="stat-bin" style="color:var(--red)">0</span><span class="lbl">BIN</span></div>
+</div>
+
+<div class="controls">
+  <div class="input-group">
+    <label>Location</label>
+    <input type="text" id="location" placeholder="Start typing a town..." autocomplete="off" oninput="handleLocationInput(this.value)" onkeydown="handleLocationKey(event)">
+    <div class="autocomplete-list" id="autocomplete-list"></div>
+  </div>
+  <div class="input-group">
+    <label>Niche</label>
+    <select id="niche">
+      <option value="">— Select a niche —</option>
+      <optgroup label="Food & Drink">
+        <option value="restaurant">Restaurants</option>
+        <option value="cafe">Cafes</option>
+        <option value="bar">Bars & Pubs</option>
+        <option value="fast_food">Fast Food</option>
+        <option value="bakery">Bakeries</option>
+        <option value="butcher">Butchers</option>
+      </optgroup>
+      <optgroup label="Health & Beauty">
+        <option value="pharmacy">Pharmacies</option>
+        <option value="hairdresser">Barbers & Hair Salons</option>
+        <option value="beauty">Beauty Salons</option>
+        <option value="dentist">Dentists</option>
+        <option value="gym">Gyms & Fitness</option>
+      </optgroup>
+      <optgroup label="Trades & Services">
+        <option value="car_repair">Car Repair</option>
+        <option value="laundry">Laundry & Dry Clean</option>
+        <option value="convenience">Convenience Stores</option>
+        <option value="clothes">Clothing & Fashion</option>
+        <option value="electronics">Electronics</option>
+      </optgroup>
+    </select>
+  </div>
+  <div class="btn-row">
+    <button class="scan-btn" id="scan-btn" onclick="startScan()">⬡ INITIATE SCOUT SCAN</button>
+    <button class="stop-btn" id="stop-btn" onclick="stopScan()" disabled>⬛ STOP</button>
+  </div>
+</div>
+
+<div id="progress-wrap">
+  <div id="progress-label">SCOUT SCANNING... 0%</div>
+  <div id="progress-bar-bg"><div id="progress-bar-fill"></div></div>
+</div>
+
+<div id="log"></div>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <div class="tab active" onclick="switchTab('leads')">📋 LEADS DATABASE</div>
+  <div class="tab bin-tab" onclick="switchTab('bin')">🗑️ BIN — NEEDS REVIEW</div>
+</div>
+
+<!-- LEADS TABLE -->
+<div id="leads-panel">
+  <div class="table-wrap">
+    <div class="table-header">
+      <h2>LEAD DATABASE</h2>
+      <button class="export-btn" onclick="exportCSV('leads')">↓ CSV</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Business</th><th>Address</th><th>Phone</th><th>Email</th><th>Website</th><th>Temp</th><th>DB</th></tr>
+        </thead>
+        <tbody id="leads-table">
+          <tr><td colspan="8"><div class="empty-state">⬡ SELECT LOCATION AND NICHE — THEN SCAN</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- BIN TABLE -->
+<div id="bin-panel" style="display:none">
+  <div class="table-wrap">
+    <div class="table-header">
+      <h2 class="bin">🗑️ BIN — NO EMAIL FOUND</h2>
+      <button class="export-btn" onclick="exportCSV('bin')">↓ CSV</button>
+    </div>
+    <div class="bin-note">⚠️ SENTINEL has been flagged to attempt deeper email search on these leads. Review manually if SENTINEL also fails.</div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Business</th><th>Address</th><th>Phone</th><th>Website</th><th>Attempted</th><th>SENTINEL</th></tr>
+        </thead>
+        <tbody id="bin-table">
+          <tr><td colspan="7"><div class="empty-state">⬡ NO BINNED LEADS YET</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://uklrgpommxqmdvetfxmc.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrbHJncG9tbXhxbWR2ZXRmeG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjQ2MTEsImV4cCI6MjA5NzQwMDYxMX0.xuKX88Hn4Wa_xLuLBrp7SsIsdlbiKbksRwYKwVKr5zI';
+const BIZDATA_URL='https://bizdata-web.vercel.app/api/businesses';
+
+const UK_TOWNS=['Aberdeen','Aberystwyth','Ascot','Aylesbury','Bangor','Bath','Bedford','Birmingham','Blackburn','Blackpool','Bolton','Bournemouth','Bradford','Brighton','Bristol','Burnley','Cambridge','Canterbury','Cardiff','Carlisle','Chelmsford','Cheltenham','Chester','Chichester','Colchester','Coventry','Crawley','Derby','Doncaster','Durham','Eastbourne','Edinburgh','Exeter','Gateshead','Glasgow','Gloucester','Guildford','Halifax','Harrogate','Hereford','Huddersfield','Hull','Inverness','Ipswich','Leeds','Leicester','Lincoln','Liverpool','London','Luton','Maidenhead','Maidstone','Manchester','Middlesbrough','Milton Keynes','Newcastle','Newport','Northampton','Norwich','Nottingham','Oxford','Peterborough','Plymouth','Portsmouth','Preston','Reading','Reigate','Salisbury','Sheffield','Shrewsbury','Slough','Southampton','Southend','St Albans','Stoke-on-Trent','Sunderland','Swansea','Swindon','Taunton','Telford','Truro','Wakefield','Windsor','Wolverhampton','Worcester','Worthing','York'];
+
+let leads=[], binned=[], scanning=false, stopped=false, activeTab='leads';
+
+// AUTOCOMPLETE
+let activeIndex=-1;
+function handleLocationInput(val){
+  const list=document.getElementById('autocomplete-list');
+  activeIndex=-1;
+  if(val.length<3){list.classList.remove('open');list.innerHTML='';return}
+  const matches=UK_TOWNS.filter(t=>t.toLowerCase().startsWith(val.toLowerCase())).slice(0,8);
+  if(!matches.length){list.classList.remove('open');return}
+  list.innerHTML=matches.map((m,i)=>`<div class="autocomplete-item" onclick="selectTown('${m}')">${m}</div>`).join('');
+  list.classList.add('open');
+}
+function handleLocationKey(e){
+  const list=document.getElementById('autocomplete-list');
+  const items=list.querySelectorAll('.autocomplete-item');
+  if(e.key==='ArrowDown'){activeIndex=Math.min(activeIndex+1,items.length-1);items.forEach((el,i)=>el.classList.toggle('active',i===activeIndex))}
+  else if(e.key==='ArrowUp'){activeIndex=Math.max(activeIndex-1,0);items.forEach((el,i)=>el.classList.toggle('active',i===activeIndex))}
+  else if(e.key==='Enter'){e.preventDefault();if(activeIndex>=0&&items[activeIndex])selectTown(items[activeIndex].textContent);else if(items.length>0)selectTown(items[0].textContent)}
+  else if(e.key==='Escape'){list.classList.remove('open')}
+}
+function selectTown(town){
+  document.getElementById('location').value=town;
+  document.getElementById('autocomplete-list').classList.remove('open');
+  document.getElementById('autocomplete-list').innerHTML='';
+}
+document.addEventListener('click',e=>{if(!e.target.closest('.input-group'))document.getElementById('autocomplete-list').classList.remove('open')});
+
+// TABS
+function switchTab(tab){
+  activeTab=tab;
+  document.getElementById('leads-panel').style.display=tab==='leads'?'block':'none';
+  document.getElementById('bin-panel').style.display=tab==='bin'?'block':'none';
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===(tab==='leads'?0:1)));
+}
+
+// LOG & STATUS
+function log(msg,type='info'){
+  const el=document.getElementById('log');
+  const time=new Date().toTimeString().slice(0,8);
+  const line=document.createElement('div');
+  line.className=`log-line ${type}`;
+  line.textContent=`[${time}] ${msg}`;
+  el.prepend(line);
+}
+function setStatus(text,color){
+  document.getElementById('status-text').textContent=text;
+  document.getElementById('status-text').style.color=color;
+  document.getElementById('status-dot').style.background=color;
+  document.getElementById('status-dot').style.boxShadow=`0 0 8px ${color}`;
+}
+function setProgress(pct,label){
+  document.getElementById('progress-wrap').style.display='block';
+  document.getElementById('progress-label').textContent=label;
+  document.getElementById('progress-bar-fill').style.width=pct+'%';
+}
+function updateStats(){
+  document.getElementById('stat-total').textContent=leads.length;
+  document.getElementById('stat-emails').textContent=leads.filter(l=>l.email).length;
+  document.getElementById('stat-sites').textContent=leads.filter(l=>l.website).length;
+  document.getElementById('stat-hot').textContent=leads.filter(l=>l.lead_temp==='HOT').length;
+  document.getElementById('stat-bin').textContent=binned.length;
+}
+function getLeadTemp(biz){
+  if(!biz.website&&!biz.email)return 'HOT';
+  if(biz.email)return 'WARM';
+  return 'COLD';
+}
+
+// RENDER
+function renderLeads(){
+  const tbody=document.getElementById('leads-table');
+  if(!leads.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state">⬡ NO LEADS YET</div></td></tr>`;return}
+  tbody.innerHTML=leads.map((l,i)=>`
+    <tr>
+      <td style="color:rgba(192,200,216,0.3)">${i+1}</td>
+      <td style="color:#fff">${l.name||'—'}</td>
+      <td style="color:rgba(192,200,216,0.5);font-size:9px">${l.address||'—'}</td>
+      <td style="color:rgba(192,200,216,0.6)">${l.phone||'—'}</td>
+      <td>${l.email?`<span class="badge email-yes">✓</span>`:'<span class="badge email-no">NONE</span>'}</td>
+      <td>${l.website?`<a href="${l.website}" target="_blank" style="color:var(--scout);font-size:9px">↗</a>`:'—'}</td>
+      <td><span class="badge ${l.lead_temp?.toLowerCase()}">${l.lead_temp||'—'}</span></td>
+      <td>${l.saved?'<span style="color:var(--green);font-size:9px">✓</span>':'—'}</td>
+    </tr>`).join('');
+}
+
+function renderBin(){
+  const tbody=document.getElementById('bin-table');
+  if(!binned.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state">⬡ BIN IS EMPTY</div></td></tr>`;return}
+  tbody.innerHTML=binned.map((b,i)=>`
+    <tr>
+      <td style="color:rgba(192,200,216,0.3)">${i+1}</td>
+      <td style="color:var(--amber)">${b.name||'—'}</td>
+      <td style="color:rgba(192,200,216,0.5);font-size:9px">${b.address||'—'}</td>
+      <td style="color:rgba(192,200,216,0.6)">${b.phone||'—'}</td>
+      <td>${b.website?`<a href="${b.website}" target="_blank" style="color:var(--scout);font-size:9px">↗ Visit</a>`:'No website'}</td>
+      <td style="font-size:9px;color:rgba(192,200,216,0.4)">${b.attempted||'—'}</td>
+      <td><span class="badge sentinel">SENTINEL</span></td>
+    </tr>`).join('');
+}
+
+// SUPABASE
+async function saveToSupabase(lead){
+  try{
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/scout_leads`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Prefer':'return=minimal'},
+      body:JSON.stringify(lead)
+    });
+    return res.ok;
+  }catch{return false}
+}
+
+async function saveToBinSupabase(lead){
+  try{
+    // Save binned leads with sentinel_required flag
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/scout_leads`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Prefer':'return=minimal'},
+      body:JSON.stringify({...lead, lead_temp:'BIN', email_found:false})
+    });
+    return res.ok;
+  }catch{return false}
+}
+
+// EMAIL SCRAPER
+async function findEmailFromWebsite(url){
+  if(!url)return '';
+  try{
+    const proxy=`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const res=await fetch(proxy,{signal:AbortSignal.timeout(6000)});
+    const data=await res.json();
+    const html=data.contents||'';
+    const emailRegex=/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+    const matches=html.match(emailRegex)||[];
+    return matches.filter(e=>!e.includes('example')&&!e.includes('sentry')&&!e.includes('schema')&&!e.includes('png')&&e.length<60)[0]||'';
+  }catch{return ''}
+}
+
+// STOP
+function stopScan(){
+  stopped=true;
+  setStatus('STOPPING...','var(--red)');
+  log('Stop requested — finishing current lead...','warn');
+  document.getElementById('stop-btn').disabled=true;
+}
+
+// MAIN SCAN
+async function startScan(){
+  if(scanning)return;
+  const location=document.getElementById('location').value.trim();
+  const niche=document.getElementById('niche').value;
+  if(!location){log('No location selected','error');return}
+  if(!niche){log('No niche selected','error');return}
+
+  scanning=true;stopped=false;leads=[];binned=[];
+  document.getElementById('scan-btn').disabled=true;
+  document.getElementById('stop-btn').disabled=false;
+  setStatus('SCANNING','var(--scout)');
+  log(`SCOUT initiated — ${location} / ${niche}`,'info');
+
+  try{
+    setProgress(5,'SCOUT CONNECTING TO BIZDATA...');
+    const url=`${BIZDATA_URL}?location=${encodeURIComponent(location)}&category=${niche}&limit=500`;
+    const res=await fetch(url);
+    const data=await res.json();
+    const businesses=data.businesses||[];
+    log(`BizData returned ${businesses.length} businesses`,'success');
+
+    if(!businesses.length){
+      log('No businesses found','warn');
+      setStatus('NO RESULTS','var(--amber)');
+      scanning=false;
+      document.getElementById('scan-btn').disabled=false;
+      document.getElementById('stop-btn').disabled=true;
+      return;
+    }
+
+    for(let i=0;i<businesses.length;i++){
+      if(stopped)break;
+
+      const biz=businesses[i];
+      const pct=Math.round(((i+1)/businesses.length)*100);
+      setProgress(pct,`SCOUT PROCESSING ${i+1}/${businesses.length} — ${biz.name||'Unknown'}`);
+
+      let email=biz.email||'';
+
+      // Stage 1 — scrape website for email
+      if(!email&&biz.website){
+        log(`Scraping website: ${biz.name}`,'info');
+        email=await findEmailFromWebsite(biz.website);
+        if(email)log(`Email found on site: ${email}`,'success');
+      }
+
+      const lead={
+        name:biz.name||'',
+        address:biz.address||'',
+        phone:biz.phone||'',
+        website:biz.website||'',
+        email,
+        niche,
+        location,
+        lead_temp:getLeadTemp({...biz,email}),
+        email_found:!!email,
+        created_at:new Date().toISOString()
+      };
+
+      if(email){
+        // Has email — save to leads database
+        const saved=await saveToSupabase(lead);
+        lead.saved=saved;
+        leads.push(lead);
+        if(saved)log(`Saved: ${biz.name}`,'success');
+      } else {
+        // No email found anywhere — send to BIN, flag for SENTINEL
+        const attempted=biz.website?'Website scraped — no email':'No website to scrape';
+        const binnedLead={...lead, attempted};
+        await saveToBinSupabase(binnedLead);
+        binned.push(binnedLead);
+        log(`Binned → SENTINEL: ${biz.name} — ${attempted}`,'warn');
+      }
+
+      updateStats();
+      renderLeads();
+      renderBin();
+      await new Promise(r=>setTimeout(r,300));
+    }
+
+    if(stopped){
+      setStatus('STOPPED','var(--red)');
+      log(`SCOUT stopped. ${leads.length} leads found, ${binned.length} binned for SENTINEL.`,'warn');
+    } else {
+      setStatus('SCAN COMPLETE','var(--green)');
+      setProgress(100,`COMPLETE — ${leads.length} leads, ${binned.length} sent to SENTINEL`);
+      log(`SCOUT done. ${leads.length} leads with emails. ${binned.length} binned → SENTINEL will attempt deeper search.`,'success');
+    }
+
+  }catch(err){
+    log(`SCOUT error: ${err.message}`,'error');
+    setStatus('ERROR','var(--red)');
+  }
+
+  scanning=false;
+  document.getElementById('scan-btn').disabled=false;
+  document.getElementById('stop-btn').disabled=true;
+}
+
+// EXPORT
+function exportCSV(type){
+  const data=type==='leads'?leads:binned;
+  if(!data.length){log('Nothing to export','warn');return}
+  const headers=type==='leads'?['Name','Address','Phone','Email','Website','Niche','Location','Lead Temp']:['Name','Address','Phone','Website','Attempted','SENTINEL Required'];
+  const rows=data.map(l=>type==='leads'?[`"${l.name}"`,`"${l.address}"`,`"${l.phone}"`,`"${l.email}"`,`"${l.website}"`,`"${l.niche}"`,`"${l.location}"`,`"${l.lead_temp}"`]:[`"${l.name}"`,`"${l.address}"`,`"${l.phone}"`,`"${l.website}"`,`"${l.attempted}"`,'"YES"']);
+  const csv=[headers,...rows].map(r=>r.join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=`SCOUT_${type}_${document.getElementById('location').value}_${Date.now()}.csv`;
+  a.click();
+  log(`${type} CSV exported`,'success');
+}
+</script>
+</body>
+</html>
