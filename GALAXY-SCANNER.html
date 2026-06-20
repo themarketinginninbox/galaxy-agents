@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GALAXY // 🖤 SCANNER</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --scanner:#8888AA;--scanner-dim:rgba(136,136,170,0.12);
+  --gold:#FFD700;--blue:#4AB3FF;--green:#00FF88;
+  --red:#FF3355;--amber:#FFAA00;--silver:#C0C8D8;
+  --bg:#010208;--panel:rgba(10,15,30,0.9);--border:rgba(136,136,170,0.2);
+}
+body{background:var(--bg);color:var(--silver);font-family:'Share Tech Mono',monospace;min-height:100vh;padding:20px}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border:1px solid var(--border);border-radius:8px;margin-bottom:20px;background:var(--panel)}
+.logo{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:4px;color:rgba(192,200,216,0.4)}
+.logo span{color:var(--scanner);font-size:18px;font-weight:900;display:block;letter-spacing:6px}
+#status-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);display:inline-block;margin-right:8px}
+#status-text{font-size:10px;letter-spacing:2px;color:var(--amber)}
+
+.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px 12px;text-align:center}
+.stat-card .val{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;display:block}
+.stat-card .lbl{font-size:7px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-top:2px;display:block}
+
+.controls{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px;display:flex;flex-direction:column;gap:12px}
+.controls h3{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;color:var(--scanner)}
+.input-group{display:flex;flex-direction:column;gap:4px}
+label{font-size:9px;letter-spacing:2px;color:var(--blue);text-transform:uppercase}
+select{background:rgba(1,2,8,0.8);border:1px solid rgba(136,136,170,0.2);border-radius:4px;padding:10px 14px;color:var(--silver);font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;width:100%}
+select:focus{border-color:var(--scanner)}
+select option{background:#0a0f1e}
+
+.scanner-btn{width:100%;padding:14px;background:transparent;border:1px solid var(--scanner);border-radius:4px;color:var(--scanner);font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:3px;cursor:pointer;transition:all 0.2s;margin-top:4px}
+.scanner-btn:hover{background:var(--scanner-dim);box-shadow:0 0 16px rgba(136,136,170,0.3)}
+.scanner-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+#progress-wrap{margin-bottom:20px;display:none}
+#progress-label{font-size:9px;color:var(--scanner);letter-spacing:1px;margin-bottom:6px}
+#progress-bar-bg{background:rgba(136,136,170,0.1);border-radius:2px;height:3px;overflow:hidden}
+#progress-bar-fill{height:100%;background:var(--scanner);border-radius:2px;width:0%;transition:width 0.3s;box-shadow:0 0 8px var(--scanner)}
+
+#log{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:20px;height:90px;overflow-y:auto;font-size:9px}
+.log-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.log-line.info{color:var(--blue)}.log-line.success{color:var(--green)}.log-line.warn{color:var(--amber)}.log-line.error{color:var(--red)}
+
+/* ERROR LOG */
+.error-wrap{background:var(--panel);border:1px solid rgba(255,51,85,0.2);border-radius:6px;overflow:hidden;margin-bottom:20px}
+.error-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,51,85,0.15)}
+.error-header h2{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--red)}
+#error-count{font-size:9px;color:rgba(192,200,216,0.3);letter-spacing:2px}
+
+.table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
+.table-header h2{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--scanner)}
+table{width:100%;border-collapse:collapse;font-size:10px}
+th{text-align:left;padding:8px 12px;font-size:7px;letter-spacing:2px;color:rgba(192,200,216,0.4);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:hover td{background:rgba(136,136,170,0.03)}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:7px;letter-spacing:1px;border:1px solid}
+.badge.checking{color:var(--blue);border-color:var(--blue)}
+.badge.approved{color:var(--green);border-color:var(--green)}
+.badge.failed{color:var(--red);border-color:var(--red)}
+.badge.requeued{color:var(--amber);border-color:var(--amber)}
+.check-icon{font-size:11px}
+.empty-state{text-align:center;padding:40px 20px;color:rgba(192,200,216,0.3);font-size:11px;letter-spacing:2px}
+
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:rgba(136,136,170,0.3);border-radius:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">GALAXY SYSTEM<span>🖤 SCANNER</span></div>
+  <div><span id="status-dot"></span><span id="status-text">STANDING BY</span></div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-card"><span class="val" id="stat-total" style="color:var(--scanner)">0</span><span class="lbl">TOTAL</span></div>
+  <div class="stat-card"><span class="val" id="stat-checking" style="color:var(--blue)">0</span><span class="lbl">CHECKING</span></div>
+  <div class="stat-card"><span class="val" id="stat-approved" style="color:var(--green)">0</span><span class="lbl">APPROVED</span></div>
+  <div class="stat-card"><span class="val" id="stat-failed" style="color:var(--red)">0</span><span class="lbl">FAILED</span></div>
+  <div class="stat-card"><span class="val" id="stat-requeued" style="color:var(--amber)">0</span><span class="lbl">REQUEUED</span></div>
+</div>
+
+<div class="controls">
+  <h3>⬡ Scanner Configuration</h3>
+  <div class="input-group">
+    <label>Max Sites To Check</label>
+    <select id="max-scan">
+      <option value="5">5 sites</option>
+      <option value="10" selected>10 sites</option>
+      <option value="25">25 sites</option>
+      <option value="999">All</option>
+    </select>
+  </div>
+  <button class="scanner-btn" id="scanner-btn" onclick="startScanner()">🖤 INITIATE SCANNER</button>
+</div>
+
+<div id="progress-wrap">
+  <div id="progress-label">SCANNER CHECKING... 0%</div>
+  <div id="progress-bar-bg"><div id="progress-bar-fill"></div></div>
+</div>
+
+<div id="log"></div>
+
+<!-- ERROR LOG -->
+<div class="error-wrap">
+  <div class="error-header">
+    <h2>ERROR LOG</h2>
+    <span id="error-count">0 ERRORS FOUND</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr><th>Business</th><th>Check Failed</th><th>Action</th><th>Attempts</th></tr>
+      </thead>
+      <tbody id="error-table">
+        <tr><td colspan="4"><div class="empty-state">⬡ NO ERRORS YET</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- RESULTS TABLE -->
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>SCAN RESULTS</h2>
+    <span style="font-size:9px;color:rgba(192,200,216,0.3);letter-spacing:2px">APPROVED → dispatch_queue</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Business</th><th>URL</th>
+          <th>Name ✓</th><th>URL Live ✓</th><th>Email ✓</th><th>Phone ✓</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="results-table">
+        <tr><td colspan="8"><div class="empty-state">⬡ AWAITING SCANNER INITIATION</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://uklrgpommxqmdvetfxmc.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrbHJncG9tbXhxbWR2ZXRmeG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjQ2MTEsImV4cCI6MjA5NzQwMDYxMX0.xuKX88Hn4Wa_xLuLBrp7SsIsdlbiKbksRwYKwVKr5zI';
+
+const MAX_RETRIES = 3;
+let queue = [], scanning = false, errors = [];
+
+function log(msg, type='info') {
+  const el = document.getElementById('log');
+  const time = new Date().toTimeString().slice(0,8);
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  line.textContent = `[${time}] ${msg}`;
+  el.prepend(line);
+}
+
+function setStatus(text, color) {
+  document.getElementById('status-text').textContent = text;
+  document.getElementById('status-text').style.color = color;
+  document.getElementById('status-dot').style.background = color;
+  document.getElementById('status-dot').style.boxShadow = `0 0 8px ${color}`;
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('progress-bar-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = label;
+}
+
+function updateStats() {
+  document.getElementById('stat-total').textContent = queue.length;
+  document.getElementById('stat-checking').textContent = queue.filter(i=>i.status==='checking').length;
+  document.getElementById('stat-approved').textContent = queue.filter(i=>i.status==='approved').length;
+  document.getElementById('stat-failed').textContent = queue.filter(i=>i.status==='failed').length;
+  document.getElementById('stat-requeued').textContent = queue.filter(i=>i.status==='requeued').length;
+  document.getElementById('error-count').textContent = `${errors.length} ERRORS FOUND`;
+}
+
+function renderResults() {
+  const tbody = document.getElementById('results-table');
+  if (!queue.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">⬡ NO RESULTS YET</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = queue.map((item, i) => `
+    <tr>
+      <td style="color:rgba(192,200,216,0.3)">${i+1}</td>
+      <td style="color:#fff">${item.business_name}</td>
+      <td style="color:var(--blue);font-size:9px">${item.live_url?'↗ '+item.live_url.slice(8,35)+'...':'—'}</td>
+      <td class="check-icon">${item.checks?.name?'✅':'❌'}</td>
+      <td class="check-icon">${item.checks?.url?'✅':'❌'}</td>
+      <td class="check-icon">${item.checks?.email?'✅':'⚠️'}</td>
+      <td class="check-icon">${item.checks?.phone?'✅':'⚠️'}</td>
+      <td><span class="badge ${item.status}">${item.status.toUpperCase()}</span></td>
+    </tr>`).join('');
+}
+
+function renderErrors() {
+  const tbody = document.getElementById('error-table');
+  if (!errors.length) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">⬡ NO ERRORS YET</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = errors.map(e => `
+    <tr>
+      <td style="color:var(--red)">${e.business_name}</td>
+      <td style="color:var(--amber);font-size:9px">${e.failed_check}</td>
+      <td style="font-size:9px">${e.action}</td>
+      <td style="color:rgba(192,200,216,0.5)">${e.attempts}/${MAX_RETRIES}</td>
+    </tr>`).join('');
+}
+
+async function sbGet(table, params='') {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+    headers: {'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`}
+  });
+  return res.json();
+}
+
+async function sbInsert(table, data) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation'},
+    body: JSON.stringify(data)
+  });
+  const result = await res.json();
+  return Array.isArray(result) ? result[0] : result;
+}
+
+async function sbUpdate(table, id, data) {
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+}
+
+async function sbInsertError(data) {
+  await fetch(`${SUPABASE_URL}/rest/v1/scanner_log`, {
+    method: 'POST',
+    headers: {'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+}
+
+// CHECK IF URL IS LIVE
+async function checkUrlLive(url) {
+  try {
+    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    return data.status?.http_code === 200 || (data.contents && data.contents.length > 100);
+  } catch { return false; }
+}
+
+// CHECK HTML CONTENT
+function checkHtmlContent(html, businessName) {
+  if (!html) return { name: false, email: false, phone: false };
+  const hasName = html.includes(businessName);
+  const hasEmail = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(html);
+  const hasPhone = /(\+44|0)[0-9\s\-]{9,}/.test(html);
+  const noPlaceholders = !html.includes('{{');
+  return { name: hasName && noPlaceholders, email: hasEmail, phone: hasPhone };
+}
+
+async function checkSite(item) {
+  item.status = 'checking';
+  item.checks = {};
+  renderResults(); updateStats();
+
+  // Get forge HTML for content checks
+  const forgeData = await sbGet('forge_output', `id=eq.${item.forge_id}&select=html,business_name`);
+  const html = forgeData[0]?.html || '';
+  const businessName = item.business_name;
+
+  // Run all checks
+  const contentChecks = checkHtmlContent(html, businessName);
+  const urlLive = await checkUrlLive(item.live_url);
+
+  item.checks = {
+    name: contentChecks.name,
+    url: urlLive,
+    email: contentChecks.email,
+    phone: contentChecks.phone
+  };
+
+  // Critical checks — name must be right and URL must be live
+  const criticalPass = item.checks.name && item.checks.url;
+  // Soft checks — email and phone are warnings not failures
+  const passed = Object.values(item.checks).filter(Boolean).length;
+  const failed = Object.values(item.checks).filter(v => !v).length;
+
+  if (criticalPass) {
+    item.status = 'approved';
+    log(`✅ APPROVED: ${businessName} — ${passed}/4 checks passed`, 'success');
+
+    // Save to scanner_log
+    await sbInsertError({
+      launch_id: item.id,
+      business_name: businessName,
+      live_url: item.live_url,
+      checks_passed: passed,
+      checks_failed: failed,
+      errors: failed > 0 ? 'Soft checks failed: email/phone missing' : null,
+      status: 'approved'
+    });
+
+    // Push to dispatch_queue
+    // Get lead email from scout_leads via forge_output
+    const forgeRow = await sbGet('forge_output', `id=eq.${item.forge_id}&select=lead_id`);
+    const leadId = forgeRow[0]?.lead_id;
+    let leadEmail = '', leadPhone = '';
+    if (leadId) {
+      const lead = await sbGet('scout_leads', `id=eq.${leadId}&select=email,phone`);
+      leadEmail = lead[0]?.email || '';
+      leadPhone = lead[0]?.phone || '';
+    }
+
+    await sbInsert('dispatch_queue', {
+      scanner_id: item.id,
+      business_name: businessName,
+      email: leadEmail,
+      live_url: item.live_url,
+      template_used: 'Template-01',
+      status: 'ready'
+    });
+
+    log(`📧 Added to dispatch_queue: ${businessName}`, 'success');
+
+  } else {
+    // Work out what failed
+    const failedChecks = [];
+    if (!item.checks.name) failedChecks.push('Business name missing or placeholder found');
+    if (!item.checks.url) failedChecks.push('Site URL not live yet');
+
+    item.status = item.attempts >= MAX_RETRIES ? 'failed' : 'requeued';
+
+    const errorEntry = {
+      business_name: businessName,
+      failed_check: failedChecks.join(', '),
+      action: item.status === 'failed' ? 'Max retries — dumped' : 'Requeued for rebuild',
+      attempts: item.attempts
+    };
+    errors.push(errorEntry);
+
+    // Log to scanner_log
+    await sbInsertError({
+      launch_id: item.id,
+      business_name: businessName,
+      live_url: item.live_url,
+      checks_passed: passed,
+      checks_failed: failed,
+      errors: failedChecks.join(', '),
+      status: item.status
+    });
+
+    if (item.status === 'requeued') {
+      // Route back to forge_output for rebuild
+      await sbUpdate('forge_output', item.forge_id, { status: 'ready' });
+      log(`⚠️ REQUEUED: ${businessName} — ${failedChecks.join(', ')}`, 'warn');
+    } else {
+      log(`❌ FAILED: ${businessName} — max retries reached`, 'error');
+    }
+
+    renderErrors();
+  }
+
+  renderResults(); updateStats();
+}
+
+async function startScanner() {
+  if (scanning) return;
+  scanning = true;
+  queue = [];
+  errors = [];
+  document.getElementById('scanner-btn').disabled = true;
+  setStatus('FETCHING FROM LAUNCH', 'var(--blue)');
+  log('SCANNER initiated — pulling live sites from launch_output', 'info');
+
+  try {
+    const max = parseInt(document.getElementById('max-scan').value);
+    const sites = await sbGet('launch_output', `status=eq.live&order=created_at.asc&limit=${max}&select=*`);
+
+    if (!sites.length) {
+      log('No live sites in launch_output — run LAUNCH first', 'warn');
+      setStatus('NO SITES', 'var(--amber)');
+      scanning = false;
+      document.getElementById('scanner-btn').disabled = false;
+      return;
+    }
+
+    log(`${sites.length} sites to check`, 'success');
+    queue = sites.map(s => ({ ...s, status: 'queued', checks: {}, attempts: 1 }));
+    renderResults(); updateStats();
+
+    for (let i = 0; i < queue.length; i++) {
+      const item = queue[i];
+      const pct = Math.round(((i+1)/queue.length)*100);
+      setProgress(pct, `CHECKING ${i+1} OF ${queue.length} — ${item.business_name}`);
+      setStatus('SCANNING', 'var(--scanner)');
+
+      await checkSite(item);
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    const approved = queue.filter(i=>i.status==='approved').length;
+    const failed = queue.filter(i=>i.status==='failed'||i.status==='requeued').length;
+
+    setStatus('SCAN COMPLETE', 'var(--green)');
+    setProgress(100, `COMPLETE — ${approved} approved, ${failed} issues`);
+    log(`SCANNER done. ${approved} sites approved → dispatch_queue. ${errors.length} errors logged.`, 'success');
+
+  } catch(err) {
+    log(`SCANNER error: ${err.message}`, 'error');
+    setStatus('ERROR', 'var(--red)');
+  }
+
+  scanning = false;
+  document.getElementById('scanner-btn').disabled = false;
+}
+</script>
+</body>
+</html>

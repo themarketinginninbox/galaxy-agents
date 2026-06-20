@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GALAXY // 🟠 DISPATCH</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --dispatch:#FFAA00;--dispatch-dim:rgba(255,170,0,0.12);
+  --gold:#FFD700;--blue:#4AB3FF;--green:#00FF88;
+  --red:#FF3355;--silver:#C0C8D8;
+  --bg:#010208;--panel:rgba(10,15,30,0.9);--border:rgba(255,170,0,0.15);
+}
+body{background:var(--bg);color:var(--silver);font-family:'Share Tech Mono',monospace;min-height:100vh;padding:20px}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border:1px solid var(--border);border-radius:8px;margin-bottom:20px;background:var(--panel)}
+.logo{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:4px;color:rgba(192,200,216,0.4)}
+.logo span{color:var(--dispatch);font-size:18px;font-weight:900;display:block;letter-spacing:6px}
+#status-dot{width:8px;height:8px;border-radius:50%;background:#FFAA00;box-shadow:0 0 8px #FFAA00;display:inline-block;margin-right:8px}
+#status-text{font-size:10px;letter-spacing:2px;color:var(--dispatch)}
+
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;text-align:center}
+.stat-card .val{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700;display:block}
+.stat-card .lbl{font-size:8px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-top:2px;display:block}
+
+.controls{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px;display:flex;flex-direction:column;gap:14px}
+.controls h3{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;color:var(--dispatch)}
+.ctrl-row{display:flex;gap:12px}
+.input-group{display:flex;flex-direction:column;gap:4px;flex:1}
+label{font-size:9px;letter-spacing:2px;color:var(--blue);text-transform:uppercase}
+select,input{background:rgba(1,2,8,0.8);border:1px solid rgba(255,170,0,0.2);border-radius:4px;padding:10px 14px;color:var(--silver);font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;transition:border-color 0.2s;width:100%}
+select:focus,input:focus{border-color:var(--dispatch)}
+select option{background:#0a0f1e}
+
+/* SPEED SLIDER */
+.slider-group{display:flex;flex-direction:column;gap:6px}
+.slider-label{display:flex;justify-content:space-between;font-size:9px;color:rgba(192,200,216,0.4)}
+.slider-label span{color:var(--dispatch)}
+input[type=range]{-webkit-appearance:none;height:3px;background:rgba(255,170,0,0.2);border-radius:2px;outline:none;padding:0;border:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--dispatch);box-shadow:0 0 8px var(--dispatch);cursor:pointer}
+
+.dispatch-btn{width:100%;padding:14px;background:transparent;border:1px solid var(--dispatch);border-radius:4px;color:var(--dispatch);font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:3px;cursor:pointer;transition:all 0.2s;margin-top:4px}
+.dispatch-btn:hover{background:var(--dispatch-dim);box-shadow:0 0 16px rgba(255,170,0,0.3)}
+.dispatch-btn:disabled{opacity:0.4;cursor:not-allowed}
+.stop-btn{width:100%;padding:10px;background:transparent;border:1px solid var(--red);border-radius:4px;color:var(--red);font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;cursor:pointer;transition:all 0.2s}
+.stop-btn:hover{background:rgba(255,51,85,0.1)}
+
+/* DEMO MODE */
+.demo-box{background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.25);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.demo-box h4{font-size:9px;letter-spacing:3px;color:var(--dispatch)}
+.demo-toggle{display:flex;align-items:center;gap:10px;font-size:10px}
+.toggle{width:36px;height:20px;background:rgba(255,255,255,0.1);border-radius:10px;cursor:pointer;position:relative;transition:background 0.3s;flex-shrink:0;border:none}
+.toggle.on{background:var(--dispatch)}
+.toggle::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left 0.3s}
+.toggle.on::after{left:19px}
+
+#progress-wrap{margin-bottom:20px;display:none}
+#progress-label{font-size:9px;color:var(--dispatch);letter-spacing:1px;margin-bottom:6px}
+#progress-bar-bg{background:rgba(255,170,0,0.1);border-radius:2px;height:3px;overflow:hidden}
+#progress-bar-fill{height:100%;background:var(--dispatch);border-radius:2px;width:0%;transition:width 0.3s;box-shadow:0 0 8px var(--dispatch)}
+
+#log{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:20px;height:100px;overflow-y:auto;font-size:9px}
+.log-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.log-line.info{color:var(--blue)}.log-line.success{color:var(--green)}.log-line.warn{color:var(--dispatch)}.log-line.error{color:var(--red)}
+
+.table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
+.table-header h2{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--dispatch)}
+table{width:100%;border-collapse:collapse;font-size:10px}
+th{text-align:left;padding:8px 12px;font-size:7px;letter-spacing:2px;color:rgba(192,200,216,0.4);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:hover td{background:rgba(255,170,0,0.02)}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:7px;letter-spacing:1px;border:1px solid}
+.badge.queued{color:var(--dispatch);border-color:var(--dispatch)}
+.badge.sending{color:var(--blue);border-color:var(--blue)}
+.badge.sent{color:var(--green);border-color:var(--green)}
+.badge.failed{color:var(--red);border-color:var(--red)}
+.badge.demo{color:#FF69B4;border-color:#FF69B4}
+.empty-state{text-align:center;padding:40px 20px;color:rgba(192,200,216,0.3);font-size:11px;letter-spacing:2px}
+
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:rgba(255,170,0,0.3);border-radius:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">GALAXY SYSTEM<span>🟠 DISPATCH</span></div>
+  <div><span id="status-dot"></span><span id="status-text">STANDING BY</span></div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-card"><span class="val" id="stat-queued" style="color:var(--dispatch)">0</span><span class="lbl">IN QUEUE</span></div>
+  <div class="stat-card"><span class="val" id="stat-sent" style="color:var(--green)">0</span><span class="lbl">SENT</span></div>
+  <div class="stat-card"><span class="val" id="stat-failed" style="color:var(--red)">0</span><span class="lbl">FAILED</span></div>
+  <div class="stat-card"><span class="val" id="stat-rate" style="color:var(--dispatch)">0/hr</span><span class="lbl">SEND RATE</span></div>
+</div>
+
+<div class="controls">
+  <h3>⬡ Dispatch Configuration</h3>
+
+  <!-- DEMO MODE -->
+  <div class="demo-box">
+    <h4>🎯 DEMO MODE</h4>
+    <div class="demo-toggle">
+      <button class="toggle" id="demo-toggle" onclick="toggleDemo()"></button>
+      <span id="demo-label">OFF — sends to real business emails</span>
+    </div>
+    <div class="input-group" id="demo-email-group" style="display:none">
+      <label>Demo Email Address</label>
+      <input type="email" id="demo-email" placeholder="your@email.com — all emails go here">
+    </div>
+  </div>
+
+  <div class="ctrl-row">
+    <div class="input-group">
+      <label>Max Sends</label>
+      <select id="max-sends">
+        <option value="1">1 email</option>
+        <option value="5" selected>5 emails</option>
+        <option value="10">10 emails</option>
+        <option value="25">25 emails</option>
+        <option value="999">All queued</option>
+      </select>
+    </div>
+    <div class="input-group">
+      <label>From Account</label>
+      <select id="from-account">
+        <option value="david@thewebsiteinn.co.uk">david@thewebsiteinn.co.uk</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="slider-group">
+    <div class="slider-label">Send Delay <span id="delay-val">30 seconds between emails</span></div>
+    <input type="range" id="send-delay" min="10" max="120" value="30" oninput="updateDelay(this.value)">
+  </div>
+
+  <button class="dispatch-btn" id="dispatch-btn" onclick="startDispatch()">🟠 INITIATE DISPATCH</button>
+  <button class="stop-btn" onclick="stopDispatch()">⬛ STOP</button>
+</div>
+
+<div id="progress-wrap">
+  <div id="progress-label">DISPATCH SENDING... 0%</div>
+  <div id="progress-bar-bg"><div id="progress-bar-fill"></div></div>
+</div>
+
+<div id="log"></div>
+
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>SEND LOG</h2>
+    <span style="font-size:9px;color:rgba(192,200,216,0.3);letter-spacing:2px">RESULTS → SAM DATABASE</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Business</th><th>To Email</th><th>From</th><th>Site URL</th><th>Status</th><th>Time</th></tr>
+      </thead>
+      <tbody id="send-table">
+        <tr><td colspan="7"><div class="empty-state">⬡ AWAITING DISPATCH INITIATION</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://uklrgpommxqmdvetfxmc.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrbHJncG9tbXhxbWR2ZXRmeG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjQ2MTEsImV4cCI6MjA5NzQwMDYxMX0.xuKX88Hn4Wa_xLuLBrp7SsIsdlbiKbksRwYKwVKr5zI';
+
+// INSTANTLY API
+const INSTANTLY_API_KEY = 'YOUR_INSTANTLY_API_KEY'; // Replace when ready
+
+let queue=[], dispatching=false, stopped=false, sentCount=0, startTime=null;
+let demoMode=false;
+
+function log(msg,type='info'){
+  const el=document.getElementById('log');
+  const time=new Date().toTimeString().slice(0,8);
+  const line=document.createElement('div');
+  line.className=`log-line ${type}`;
+  line.textContent=`[${time}] ${msg}`;
+  el.prepend(line);
+}
+
+function setStatus(text,color){
+  document.getElementById('status-text').textContent=text;
+  document.getElementById('status-text').style.color=color;
+  document.getElementById('status-dot').style.background=color;
+  document.getElementById('status-dot').style.boxShadow=`0 0 8px ${color}`;
+}
+
+function setProgress(pct,label){
+  document.getElementById('progress-wrap').style.display='block';
+  document.getElementById('progress-bar-fill').style.width=pct+'%';
+  document.getElementById('progress-label').textContent=label;
+}
+
+function updateDelay(val){
+  document.getElementById('delay-val').textContent=`${val} seconds between emails`;
+}
+
+function toggleDemo(){
+  demoMode=!demoMode;
+  const btn=document.getElementById('demo-toggle');
+  const label=document.getElementById('demo-label');
+  const emailGroup=document.getElementById('demo-email-group');
+  btn.classList.toggle('on',demoMode);
+  label.textContent=demoMode?'ON — all emails go to demo address':'OFF — sends to real business emails';
+  emailGroup.style.display=demoMode?'flex':'none';
+}
+
+function updateStats(){
+  document.getElementById('stat-queued').textContent=queue.filter(i=>i.status==='queued').length;
+  document.getElementById('stat-sent').textContent=queue.filter(i=>i.status==='sent').length;
+  document.getElementById('stat-failed').textContent=queue.filter(i=>i.status==='failed').length;
+  if(startTime&&sentCount>0){
+    const mins=(Date.now()-startTime)/60000;
+    const rate=Math.round(sentCount/mins*60);
+    document.getElementById('stat-rate').textContent=`${rate}/hr`;
+  }
+}
+
+function renderTable(){
+  const tbody=document.getElementById('send-table');
+  if(!queue.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state">⬡ NO SENDS YET</div></td></tr>`;return}
+  tbody.innerHTML=queue.map((item,i)=>`
+    <tr>
+      <td style="color:rgba(192,200,216,0.3)">${i+1}</td>
+      <td style="color:#fff">${item.business_name}</td>
+      <td style="color:rgba(192,200,216,0.6);font-size:9px">${item.to_email||'—'}</td>
+      <td style="color:var(--dispatch);font-size:9px">david@thewebsiteinn.co.uk</td>
+      <td style="color:var(--blue);font-size:9px">${item.live_url?'↗ Site':'-'}</td>
+      <td><span class="badge ${item.status}${demoMode&&item.status==='sent'?' demo':''}">${item.status==='sent'&&demoMode?'DEMO SENT':item.status.toUpperCase()}</span></td>
+      <td style="color:rgba(192,200,216,0.4);font-size:9px">${item.sent_at||'—'}</td>
+    </tr>`).join('');
+}
+
+// EMAIL TEMPLATE
+function buildEmail(item, fromEmail) {
+  const toEmail = demoMode ? document.getElementById('demo-email').value : item.email;
+  const subject = `${item.business_name} — We Built This For You`;
+  const body = `We built your website. See it here:
+
+${item.live_url}
+
+We don't send this to everyone.
+
+We came across ${item.business_name} and felt you were being underrepresented online. So we built something. No obligation. No catch. Just click the link.
+
+If it's the standard you'd expect your business to be represented at — reply to this email. We'll get a call booked and take it from there.
+
+We're not going to chase. Either it resonates or it doesn't.
+
+---
+
+Yes this is a cold email. We get it. Before you close this — Google us, find us on Instagram, look us up on Companies House. We're a legitimate UK agency that builds websites for businesses who deserve better than what they've got. We just let the work do the talking first.
+
+— The Website Inn
+thewebsiteinn.co.uk`;
+
+  return { to: toEmail, subject, body, from: fromEmail };
+}
+
+// SEND VIA INSTANTLY API
+async function sendViaInstantly(emailData) {
+  // Instantly.ai Lead API — adds lead and triggers campaign email
+  const res = await fetch('https://api.instantly.ai/api/v1/lead/add', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${INSTANTLY_API_KEY}`
+    },
+    body: JSON.stringify({
+      api_key: INSTANTLY_API_KEY,
+      campaign_id: 'GALAXY_CAMPAIGN_01',
+      skip_if_in_workspace: true,
+      leads: [{
+        email: emailData.to,
+        first_name: emailData.businessName,
+        custom_variables: {
+          business_name: emailData.businessName,
+          site_url: emailData.siteUrl,
+          from_email: emailData.from
+        }
+      }]
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || `Instantly error ${res.status}`);
+  }
+  return res.json();
+}
+
+// DEMO SEND — direct email via EmailJS or similar
+async function sendDemoEmail(emailData) {
+  // For demo purposes — logs the email content and marks as sent
+  // In production this would use Instantly API
+  console.log('DEMO EMAIL:', emailData);
+  log(`DEMO: Would send to ${emailData.to}`, 'warn');
+  log(`Subject: ${emailData.subject}`, 'info');
+  log(`Site URL: ${emailData.siteUrl}`, 'info');
+  // Simulate send delay
+  await new Promise(r => setTimeout(r, 500));
+  return { success: true, demo: true };
+}
+
+async function sbGet(table,params=''){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`,{
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+  });
+  return res.json();
+}
+
+async function sbUpdate(table,id,data){
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`,{
+    method:'PATCH',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},
+    body:JSON.stringify(data)
+  });
+}
+
+async function sbInsert(table,data){
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}`,{
+    method:'POST',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},
+    body:JSON.stringify(data)
+  });
+}
+
+function stopDispatch(){
+  stopped=true;
+  setStatus('STOPPED','var(--red)');
+  log('DISPATCH stopped by user','warn');
+}
+
+async function startDispatch(){
+  if(dispatching)return;
+
+  if(demoMode){
+    const demoEmail=document.getElementById('demo-email').value;
+    if(!demoEmail){log('Enter a demo email address first','error');return}
+  }
+
+  dispatching=true;
+  stopped=false;
+  sentCount=0;
+  startTime=Date.now();
+  queue=[];
+  document.getElementById('dispatch-btn').disabled=true;
+  setStatus('FETCHING QUEUE','var(--blue)');
+  log('DISPATCH initiated — pulling from dispatch_queue','info');
+
+  try{
+    const max=parseInt(document.getElementById('max-sends').value);
+    const fromEmail='david@thewebsiteinn.co.uk';
+    const delayMs=parseInt(document.getElementById('send-delay').value)*1000;
+
+    const items=await sbGet('dispatch_queue',`status=eq.ready&order=created_at.asc&limit=${max}&select=*`);
+
+    if(!items.length){
+      log('No emails in dispatch_queue — run SCANNER first','warn');
+      setStatus('QUEUE EMPTY','var(--dispatch)');
+      dispatching=false;
+      document.getElementById('dispatch-btn').disabled=false;
+      return;
+    }
+
+    log(`${items.length} emails queued — beginning dispatch`,'success');
+    if(demoMode)log(`DEMO MODE ON — all emails → ${document.getElementById('demo-email').value}`,'warn');
+
+    queue=items.map(i=>({...i,status:'queued',to_email:demoMode?document.getElementById('demo-email').value:i.email,sent_at:null}));
+    renderTable();updateStats();
+
+    for(let i=0;i<queue.length;i++){
+      if(stopped)break;
+
+      const item=queue[i];
+      const pct=Math.round(((i+1)/queue.length)*100);
+      setProgress(pct,`SENDING ${i+1} OF ${queue.length} — ${item.business_name}`);
+      setStatus('SENDING','var(--dispatch)');
+      item.status='sending';
+      renderTable();updateStats();
+
+      try{
+        const emailData={
+          to: demoMode?document.getElementById('demo-email').value:item.email,
+          from: fromEmail,
+          subject:`${item.business_name} — We Built This For You`,
+          businessName: item.business_name,
+          siteUrl: item.live_url,
+          body: buildEmail(item, fromEmail).body
+        };
+
+        if(demoMode){
+          await sendDemoEmail(emailData);
+        } else {
+          await sendViaInstantly(emailData);
+        }
+
+        item.status='sent';
+        item.sent_at=new Date().toTimeString().slice(0,8);
+        sentCount++;
+
+        // Update dispatch_queue
+        await sbUpdate('dispatch_queue',item.id,{status:'sent',sent_at:new Date().toISOString()});
+
+        // Save to SAM database (sam_leads table — logs confirmed send)
+        await sbInsert('scout_leads_sent',{
+          business_name:item.business_name,
+          email:item.email,
+          live_url:item.live_url,
+          sent_at:new Date().toISOString(),
+          from_email:fromEmail,
+          template:'Template-01',
+          status:'sent'
+        }).catch(()=>{}); // SAM table - non blocking
+
+        log(`✅ SENT: ${item.business_name} → ${emailData.to}`,'success');
+
+      }catch(e){
+        item.status='failed';
+        log(`❌ FAILED: ${item.business_name} — ${e.message}`,'error');
+        await sbUpdate('dispatch_queue',item.id,{status:'failed'});
+      }
+
+      renderTable();updateStats();
+
+      // Delay between sends
+      if(i < queue.length-1 && !stopped){
+        log(`Waiting ${delayMs/1000}s before next send...`,'info');
+        await new Promise(r=>setTimeout(r,delayMs));
+      }
+    }
+
+    if(!stopped){
+      setStatus('DISPATCH COMPLETE','var(--green)');
+      setProgress(100,`COMPLETE — ${sentCount} emails sent`);
+      log(`DISPATCH done. ${sentCount} emails sent. SAM has been notified.`,'success');
+    }
+
+  }catch(err){
+    log(`DISPATCH error: ${err.message}`,'error');
+    setStatus('ERROR','var(--red)');
+  }
+
+  dispatching=false;
+  document.getElementById('dispatch-btn').disabled=false;
+}
+</script>
+</body>
+</html>

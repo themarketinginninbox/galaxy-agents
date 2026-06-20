@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GALAXY // 🟢 LAUNCH</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --launch:#00FF88;--launch-dim:rgba(0,255,136,0.12);
+  --gold:#FFD700;--blue:#4AB3FF;--red:#FF3355;
+  --amber:#FFAA00;--silver:#C0C8D8;
+  --bg:#010208;--panel:rgba(10,15,30,0.9);--border:rgba(0,255,136,0.15);
+}
+body{background:var(--bg);color:var(--silver);font-family:'Share Tech Mono',monospace;min-height:100vh;padding:20px}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border:1px solid var(--border);border-radius:8px;margin-bottom:20px;background:var(--panel)}
+.logo{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:4px;color:rgba(192,200,216,0.4)}
+.logo span{color:var(--launch);font-size:18px;font-weight:900;display:block;letter-spacing:6px}
+#status-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);display:inline-block;margin-right:8px}
+#status-text{font-size:10px;letter-spacing:2px;color:var(--amber)}
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;text-align:center}
+.stat-card .val{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700;display:block}
+.stat-card .lbl{font-size:8px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-top:2px;display:block}
+.controls{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px;display:flex;flex-direction:column;gap:12px}
+.controls h3{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;color:var(--launch)}
+.input-group{display:flex;flex-direction:column;gap:4px}
+label{font-size:9px;letter-spacing:2px;color:var(--blue);text-transform:uppercase}
+select{background:rgba(1,2,8,0.8);border:1px solid rgba(0,255,136,0.2);border-radius:4px;padding:10px 14px;color:var(--silver);font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;width:100%}
+select:focus{border-color:var(--launch)}
+select option{background:#0a0f1e}
+.launch-btn{width:100%;padding:14px;background:transparent;border:1px solid var(--launch);border-radius:4px;color:var(--launch);font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:3px;cursor:pointer;transition:all 0.2s;margin-top:4px}
+.launch-btn:hover{background:var(--launch-dim);box-shadow:0 0 16px rgba(0,255,136,0.3)}
+.launch-btn:disabled{opacity:0.4;cursor:not-allowed}
+#progress-wrap{margin-bottom:20px;display:none}
+#progress-label{font-size:9px;color:var(--launch);letter-spacing:1px;margin-bottom:6px}
+#progress-bar-bg{background:rgba(0,255,136,0.1);border-radius:2px;height:3px;overflow:hidden}
+#progress-bar-fill{height:100%;background:var(--launch);border-radius:2px;width:0%;transition:width 0.3s;box-shadow:0 0 8px var(--launch)}
+#log{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:20px;height:90px;overflow-y:auto;font-size:9px}
+.log-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.log-line.info{color:var(--blue)}.log-line.success{color:var(--launch)}.log-line.warn{color:var(--amber)}.log-line.error{color:var(--red)}
+.table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
+.table-header h2{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--launch)}
+table{width:100%;border-collapse:collapse;font-size:10px}
+th{text-align:left;padding:8px 12px;font-size:7px;letter-spacing:2px;color:rgba(192,200,216,0.4);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:hover td{background:rgba(0,255,136,0.02)}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:7px;letter-spacing:1px;border:1px solid}
+.badge.queued{color:var(--amber);border-color:var(--amber)}
+.badge.deploying{color:var(--blue);border-color:var(--blue)}
+.badge.live{color:var(--launch);border-color:var(--launch)}
+.badge.failed{color:var(--red);border-color:var(--red)}
+.live-link{color:var(--launch);font-size:9px;text-decoration:none}
+.live-link:hover{text-decoration:underline}
+.empty-state{text-align:center;padding:40px 20px;color:rgba(192,200,216,0.3);font-size:11px;letter-spacing:2px}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:rgba(0,255,136,0.3);border-radius:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">GALAXY SYSTEM<span>🟢 LAUNCH</span></div>
+  <div><span id="status-dot"></span><span id="status-text">STANDING BY</span></div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-card"><span class="val" id="stat-queued" style="color:var(--amber)">0</span><span class="lbl">QUEUED</span></div>
+  <div class="stat-card"><span class="val" id="stat-deploying" style="color:var(--blue)">0</span><span class="lbl">DEPLOYING</span></div>
+  <div class="stat-card"><span class="val" id="stat-live" style="color:var(--launch)">0</span><span class="lbl">LIVE</span></div>
+  <div class="stat-card"><span class="val" id="stat-failed" style="color:var(--red)">0</span><span class="lbl">FAILED</span></div>
+</div>
+
+<div class="controls">
+  <h3>⬡ Deploy Configuration</h3>
+  <div class="input-group">
+    <label>Max Deployments</label>
+    <select id="max-deploys">
+      <option value="5">5 sites</option>
+      <option value="10" selected>10 sites</option>
+      <option value="25">25 sites</option>
+      <option value="50">50 sites</option>
+      <option value="999">All ready sites</option>
+    </select>
+  </div>
+  <button class="launch-btn" id="launch-btn" onclick="startLaunch()">🟢 INITIATE LAUNCH</button>
+</div>
+
+<div id="progress-wrap">
+  <div id="progress-label">LAUNCH DEPLOYING... 0%</div>
+  <div id="progress-bar-bg"><div id="progress-bar-fill"></div></div>
+</div>
+
+<div id="log"></div>
+
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>DEPLOYMENT LOG</h2>
+    <span style="font-size:9px;color:rgba(192,200,216,0.3);letter-spacing:2px">PULLS FROM forge_output → SAVES TO launch_output</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Business</th><th>Repo</th><th>Status</th><th>Live URL</th></tr>
+      </thead>
+      <tbody id="deploy-table">
+        <tr><td colspan="5"><div class="empty-state">⬡ AWAITING LAUNCH INITIATION</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://uklrgpommxqmdvetfxmc.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrbHJncG9tbXhxbWR2ZXRmeG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjQ2MTEsImV4cCI6MjA5NzQwMDYxMX0.xuKX88Hn4Wa_xLuLBrp7SsIsdlbiKbksRwYKwVKr5zI';
+const GITHUB_TOKEN='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';
+const GITHUB_USER='themarketinginninbox';
+const GITHUB_API='https://api.github.com';
+
+let queue=[],launching=false;
+
+function log(msg,type='info'){
+  const el=document.getElementById('log');
+  const time=new Date().toTimeString().slice(0,8);
+  const line=document.createElement('div');
+  line.className=`log-line ${type}`;
+  line.textContent=`[${time}] ${msg}`;
+  el.prepend(line);
+}
+function setStatus(text,color){
+  document.getElementById('status-text').textContent=text;
+  document.getElementById('status-text').style.color=color;
+  document.getElementById('status-dot').style.background=color;
+  document.getElementById('status-dot').style.boxShadow=`0 0 8px ${color}`;
+}
+function setProgress(pct,label){
+  document.getElementById('progress-wrap').style.display='block';
+  document.getElementById('progress-bar-fill').style.width=pct+'%';
+  document.getElementById('progress-label').textContent=label;
+}
+function updateStats(){
+  document.getElementById('stat-queued').textContent=queue.filter(i=>i.status==='queued').length;
+  document.getElementById('stat-deploying').textContent=queue.filter(i=>i.status==='deploying').length;
+  document.getElementById('stat-live').textContent=queue.filter(i=>i.status==='live').length;
+  document.getElementById('stat-failed').textContent=queue.filter(i=>i.status==='failed').length;
+}
+function renderTable(){
+  const tbody=document.getElementById('deploy-table');
+  if(!queue.length){tbody.innerHTML=`<tr><td colspan="5"><div class="empty-state">⬡ NO DEPLOYMENTS YET</div></td></tr>`;return}
+  tbody.innerHTML=queue.map((item,i)=>`
+    <tr>
+      <td style="color:rgba(192,200,216,0.3)">${i+1}</td>
+      <td style="color:#fff">${item.business_name}</td>
+      <td style="color:rgba(192,200,216,0.5);font-size:9px">${item.repo||'—'}</td>
+      <td><span class="badge ${item.status}">${item.status.toUpperCase()}</span></td>
+      <td>${item.url?`<a class="live-link" href="${item.url}" target="_blank">↗ LIVE</a>`:'—'}</td>
+    </tr>`).join('');
+}
+
+async function sbGet(table,params=''){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`,{
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+  });
+  return res.json();
+}
+async function sbInsert(table,data){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/${table}`,{
+    method:'POST',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify(data)
+  });
+  const result=await res.json();
+  return Array.isArray(result)?result[0]:result;
+}
+async function sbUpdate(table,id,data){
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`,{
+    method:'PATCH',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},
+    body:JSON.stringify(data)
+  });
+}
+
+async function githubRequest(endpoint,method='GET',body=null){
+  const opts={method,headers:{'Authorization':`token ${GITHUB_TOKEN}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'}};
+  if(body)opts.body=JSON.stringify(body);
+  const res=await fetch(`${GITHUB_API}${endpoint}`,opts);
+  if(!res.ok&&res.status!==422&&res.status!==409){
+    const err=await res.json();
+    throw new Error(err.message||`GitHub error ${res.status}`);
+  }
+  return res.status===204?null:res.json();
+}
+
+function slugify(name){
+  return name.toLowerCase().replace(/[^a-z0-9\s]/g,'').trim().replace(/\s+/g,'-').slice(0,40);
+}
+
+async function deploySite(item){
+  const slug=slugify(item.business_name);
+  const repoName=`galaxy-${slug}`;
+  const liveUrl=`https://${GITHUB_USER}.github.io/${repoName}/`;
+  item.repo=repoName;
+  item.url=liveUrl;
+  item.status='deploying';
+  renderTable();updateStats();
+
+  // Create repo
+  try{
+    await githubRequest('/user/repos','POST',{name:repoName,description:`GALAXY — ${item.business_name} — The Website Inn`,private:false,auto_init:false});
+    log(`Repo created: ${repoName}`,'success');
+  }catch(e){
+    if(e.message.includes('already exists')){log(`Repo exists, reusing: ${repoName}`,'warn')}
+    else throw e;
+  }
+
+  await new Promise(r=>setTimeout(r,1500));
+
+  // Push index.html
+  const encoded=btoa(unescape(encodeURIComponent(item.html)));
+  let sha=null;
+  try{
+    const existing=await githubRequest(`/repos/${GITHUB_USER}/${repoName}/contents/index.html`);
+    sha=existing.sha;
+  }catch(e){}
+  const pushBody={message:'GALAXY LAUNCH — deployed by The Website Inn',content:encoded};
+  if(sha)pushBody.sha=sha;
+  await githubRequest(`/repos/${GITHUB_USER}/${repoName}/contents/index.html`,'PUT',pushBody);
+  log(`Site deployed: ${repoName}`,'success');
+
+  await new Promise(r=>setTimeout(r,1000));
+
+  // Enable Pages
+  try{
+    await githubRequest(`/repos/${GITHUB_USER}/${repoName}/pages`,'POST',{source:{branch:'main',path:'/'}});
+    log(`GitHub Pages enabled: ${liveUrl}`,'success');
+  }catch(e){
+    log(`Pages note: ${e.message}`,'warn');
+  }
+
+  // Save to launch_output
+  const saved=await sbInsert('launch_output',{
+    forge_id:item.forge_id,
+    business_name:item.business_name,
+    github_repo:repoName,
+    live_url:liveUrl,
+    status:'live'
+  });
+
+  // Update forge_output status
+  await sbUpdate('forge_output',item.forge_id,{status:'deployed'});
+
+  item.status='live';
+  log(`🟢 LIVE: ${item.business_name} → ${liveUrl}`,'success');
+  renderTable();updateStats();
+  return saved;
+}
+
+async function startLaunch(){
+  if(launching)return;
+  launching=true;
+  queue=[];
+  document.getElementById('launch-btn').disabled=true;
+  setStatus('FETCHING FROM FORGE','var(--blue)');
+  log('LAUNCH initiated — pulling ready sites from forge_output','info');
+
+  try{
+    const max=parseInt(document.getElementById('max-deploys').value);
+    const sites=await sbGet('forge_output',`status=eq.ready&order=created_at.asc&limit=${max}&select=*`);
+
+    if(!sites.length){
+      log('No sites ready in forge_output — run FORGE first','warn');
+      setStatus('NO SITES READY','var(--amber)');
+      launching=false;
+      document.getElementById('launch-btn').disabled=false;
+      return;
+    }
+
+    log(`${sites.length} sites ready — beginning deployments`,'success');
+    queue=sites.map(s=>({...s,status:'queued',repo:null,url:null}));
+    renderTable();updateStats();
+
+    for(let i=0;i<queue.length;i++){
+      const item=queue[i];
+      const pct=Math.round(((i+1)/queue.length)*100);
+      setProgress(pct,`DEPLOYING ${i+1} OF ${queue.length} — ${item.business_name}`);
+
+      try{
+        await deploySite(item);
+      }catch(e){
+        item.status='failed';
+        log(`FAILED: ${item.business_name} — ${e.message}`,'error');
+        renderTable();updateStats();
+      }
+
+      await new Promise(r=>setTimeout(r,2000));
+    }
+
+    setStatus('LAUNCH COMPLETE','var(--launch)');
+    setProgress(100,`COMPLETE — ${queue.filter(i=>i.status==='live').length} sites live`);
+    log(`LAUNCH done. ${queue.filter(i=>i.status==='live').length} sites live → SCANNER can now verify.`,'success');
+
+  }catch(err){
+    log(`LAUNCH error: ${err.message}`,'error');
+    setStatus('ERROR','var(--red)');
+  }
+
+  launching=false;
+  document.getElementById('launch-btn').disabled=false;
+}
+</script>
+</body>
+</html>

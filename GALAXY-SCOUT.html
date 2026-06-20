@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GALAXY // SCOUT</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#FFD700;--blue:#4AB3FF;--green:#00FF88;
+  --red:#FF3355;--amber:#FFAA00;--silver:#C0C8D8;
+  --bg:#010208;--panel:rgba(10,15,30,0.9);--border:rgba(74,179,255,0.15);
+}
+body{background:var(--bg);color:var(--silver);font-family:'Share Tech Mono',monospace;min-height:100vh;padding:20px}
+
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 24px;border:1px solid var(--border);border-radius:8px;
+  margin-bottom:20px;background:var(--panel);
+}
+.logo{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:4px;color:rgba(192,200,216,0.4)}
+.logo span{color:var(--blue);font-size:18px;font-weight:900;display:block;letter-spacing:6px}
+#status-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);display:inline-block;margin-right:8px}
+#status-text{font-size:10px;letter-spacing:2px;color:var(--amber)}
+
+/* CONTROLS */
+.controls{
+  display:flex;flex-direction:column;gap:12px;
+  margin-bottom:20px;
+}
+.input-group{display:flex;flex-direction:column;gap:4px;position:relative}
+label{font-size:9px;letter-spacing:2px;color:var(--blue);text-transform:uppercase}
+
+input,select{
+  background:var(--panel);border:1px solid var(--border);border-radius:4px;
+  padding:12px 16px;color:var(--silver);
+  font-family:'Share Tech Mono',monospace;font-size:13px;
+  outline:none;transition:border-color 0.2s;width:100%;
+}
+input:focus,select:focus{border-color:var(--blue)}
+select option{background:#0a0f1e}
+
+/* AUTOCOMPLETE */
+.autocomplete-list{
+  position:absolute;top:100%;left:0;right:0;z-index:100;
+  background:#0a0f1e;border:1px solid var(--blue);border-top:none;
+  border-radius:0 0 4px 4px;max-height:200px;overflow-y:auto;
+  display:none;
+}
+.autocomplete-list.open{display:block}
+.autocomplete-item{
+  padding:10px 16px;font-size:12px;cursor:pointer;
+  color:var(--silver);transition:background 0.15s;
+  border-bottom:1px solid rgba(74,179,255,0.06);
+}
+.autocomplete-item:hover,.autocomplete-item.active{
+  background:rgba(74,179,255,0.1);color:var(--blue);
+}
+
+.scan-btn{
+  width:100%;padding:14px;
+  background:transparent;border:1px solid var(--green);border-radius:4px;
+  color:var(--green);font-family:'Orbitron',sans-serif;
+  font-size:11px;letter-spacing:3px;cursor:pointer;
+  transition:all 0.2s;margin-top:4px;
+}
+.scan-btn:hover{background:rgba(0,255,136,0.1);box-shadow:0 0 16px rgba(0,255,136,0.3)}
+.scan-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+/* STATS */
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;text-align:center}
+.stat-card .val{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700;display:block}
+.stat-card .lbl{font-size:8px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-top:2px;display:block}
+.stat-card.total .val{color:var(--gold)}
+.stat-card.emails .val{color:var(--green)}
+.stat-card.sites .val{color:var(--blue)}
+.stat-card.hot .val{color:var(--amber)}
+
+/* PROGRESS */
+#progress-wrap{margin-bottom:20px;display:none}
+#progress-label{font-size:9px;color:var(--blue);letter-spacing:1px;margin-bottom:6px}
+#progress-bar-bg{background:rgba(74,179,255,0.1);border-radius:2px;height:3px;overflow:hidden}
+#progress-bar-fill{height:100%;background:var(--blue);border-radius:2px;width:0%;transition:width 0.3s;box-shadow:0 0 8px var(--blue)}
+
+/* LOG */
+#log{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:20px;height:80px;overflow-y:auto;font-size:9px}
+.log-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.log-line.info{color:var(--blue)}.log-line.success{color:var(--green)}.log-line.warn{color:var(--amber)}.log-line.error{color:var(--red)}
+
+/* TABLE */
+.table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
+.table-header h2{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--blue)}
+.export-btn{padding:5px 14px;background:transparent;border:1px solid var(--gold);border-radius:3px;color:var(--gold);font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;cursor:pointer;transition:all 0.2s}
+.export-btn:hover{background:rgba(255,215,0,0.1)}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:left;padding:10px 12px;font-size:8px;letter-spacing:2px;color:rgba(192,200,216,0.4);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:hover td{background:rgba(74,179,255,0.03)}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:8px;letter-spacing:1px;border:1px solid}
+.badge.hot{color:var(--amber);border-color:var(--amber)}
+.badge.warm{color:var(--blue);border-color:var(--blue)}
+.badge.cold{color:rgba(192,200,216,0.4);border-color:rgba(192,200,216,0.2)}
+.badge.email-yes{color:var(--green);border-color:var(--green)}
+.badge.email-no{color:rgba(192,200,216,0.3);border-color:rgba(192,200,216,0.1)}
+.empty-state{text-align:center;padding:60px 20px;color:rgba(192,200,216,0.3);font-size:11px;letter-spacing:2px}
+.empty-state .icon{font-size:32px;margin-bottom:12px;display:block}
+
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:rgba(74,179,255,0.3);border-radius:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">GALAXY SYSTEM<span>SCOUT</span></div>
+  <div><span id="status-dot"></span><span id="status-text">STANDING BY</span></div>
+</header>
+
+<div class="controls">
+  <div class="input-group">
+    <label>Location</label>
+    <input type="text" id="location" placeholder="Start typing a town..." autocomplete="off" oninput="handleLocationInput(this.value)" onkeydown="handleLocationKey(event)">
+    <div class="autocomplete-list" id="autocomplete-list"></div>
+  </div>
+
+  <div class="input-group">
+    <label>Niche</label>
+    <select id="niche">
+      <option value="">— Select a niche —</option>
+      <optgroup label="Food & Drink">
+        <option value="restaurant">Restaurants</option>
+        <option value="cafe">Cafes</option>
+        <option value="bar">Bars & Pubs</option>
+        <option value="fast_food">Fast Food</option>
+        <option value="bakery">Bakeries</option>
+        <option value="butcher">Butchers</option>
+      </optgroup>
+      <optgroup label="Health & Beauty">
+        <option value="pharmacy">Pharmacies</option>
+        <option value="hairdresser">Barbers & Hair Salons</option>
+        <option value="beauty">Beauty Salons</option>
+        <option value="dentist">Dentists</option>
+        <option value="gym">Gyms & Fitness</option>
+      </optgroup>
+      <optgroup label="Trades & Services">
+        <option value="car_repair">Car Repair & Garages</option>
+        <option value="laundry">Laundry & Dry Clean</option>
+        <option value="convenience">Convenience Stores</option>
+        <option value="clothes">Clothing & Fashion</option>
+        <option value="electronics">Electronics</option>
+      </optgroup>
+    </select>
+  </div>
+
+  <button class="scan-btn" id="scan-btn" onclick="startScan()">⬡ INITIATE SCOUT SCAN</button>
+</div>
+
+<div class="stats-bar">
+  <div class="stat-card total"><span class="val" id="stat-total">0</span><span class="lbl">LEADS FOUND</span></div>
+  <div class="stat-card emails"><span class="val" id="stat-emails">0</span><span class="lbl">EMAILS FOUND</span></div>
+  <div class="stat-card sites"><span class="val" id="stat-sites">0</span><span class="lbl">HAS WEBSITE</span></div>
+  <div class="stat-card hot"><span class="val" id="stat-hot">0</span><span class="lbl">HOT LEADS</span></div>
+</div>
+
+<div id="progress-wrap">
+  <div id="progress-label">SCOUT SCANNING... 0%</div>
+  <div id="progress-bar-bg"><div id="progress-bar-fill"></div></div>
+</div>
+
+<div id="log"></div>
+
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>LEAD DATABASE</h2>
+    <button class="export-btn" onclick="exportCSV()">↓ EXPORT CSV</button>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Business Name</th><th>Address</th>
+          <th>Phone</th><th>Email</th><th>Website</th>
+          <th>Temp</th><th>Saved</th>
+        </tr>
+      </thead>
+      <tbody id="leads-table">
+        <tr><td colspan="8"><div class="empty-state"><span class="icon">⬡</span>SELECT LOCATION AND NICHE — THEN INITIATE SCAN</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://uklrgpommxqmdvetfxmc.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrbHJncG9tbXhxbWR2ZXRmeG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjQ2MTEsImV4cCI6MjA5NzQwMDYxMX0.xuKX88Hn4Wa_xLuLBrp7SsIsdlbiKbksRwYKwVKr5zI';
+const BIZDATA_URL = 'https://bizdata-web.vercel.app/api/businesses';
+
+// UK TOWNS LIST
+const UK_TOWNS = [
+  'Aberdeen','Aberystwyth','Ascot','Aylesbury','Bangor','Bath','Bedford',
+  'Birmingham','Blackburn','Blackpool','Bolton','Bournemouth','Bradford',
+  'Brighton','Bristol','Burnley','Cambridge','Canterbury','Cardiff','Carlisle',
+  'Chelmsford','Cheltenham','Chester','Chichester','Colchester','Coventry',
+  'Crawley','Derby','Doncaster','Durham','Eastbourne','Edinburgh','Exeter',
+  'Gateshead','Glasgow','Gloucester','Guildford','Halifax','Harrogate',
+  'Hereford','Huddersfield','Hull','Inverness','Ipswich','Leeds','Leicester',
+  'Lincoln','Liverpool','London','Luton','Maidenhead','Maidstone','Manchester',
+  'Middlesbrough','Milton Keynes','Newcastle','Newport','Northampton','Norwich',
+  'Nottingham','Oxford','Peterborough','Plymouth','Portsmouth','Preston',
+  'Reading','Reigate','Salisbury','Sheffield','Shrewsbury','Slough','Southampton',
+  'Southend','St Albans','Stoke-on-Trent','Sunderland','Swansea','Swindon',
+  'Taunton','Telford','Truro','Wakefield','Windsor','Wolverhampton','Worcester',
+  'Worthing','York'
+];
+
+let activeIndex = -1;
+let leads = [];
+let scanning = false;
+
+// AUTOCOMPLETE
+function handleLocationInput(val) {
+  const list = document.getElementById('autocomplete-list');
+  activeIndex = -1;
+  if (val.length < 3) { list.classList.remove('open'); list.innerHTML = ''; return; }
+  const matches = UK_TOWNS.filter(t => t.toLowerCase().startsWith(val.toLowerCase())).slice(0, 8);
+  if (matches.length === 0) { list.classList.remove('open'); return; }
+  list.innerHTML = matches.map((m, i) => `<div class="autocomplete-item" onclick="selectTown('${m}')" data-index="${i}">${m}</div>`).join('');
+  list.classList.add('open');
+}
+
+function handleLocationKey(e) {
+  const list = document.getElementById('autocomplete-list');
+  const items = list.querySelectorAll('.autocomplete-item');
+  if (e.key === 'ArrowDown') { activeIndex = Math.min(activeIndex + 1, items.length - 1); highlightItem(items); }
+  else if (e.key === 'ArrowUp') { activeIndex = Math.max(activeIndex - 1, 0); highlightItem(items); }
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (activeIndex >= 0 && items[activeIndex]) selectTown(items[activeIndex].textContent);
+    else if (items.length > 0) selectTown(items[0].textContent);
+  }
+  else if (e.key === 'Escape') { list.classList.remove('open'); }
+}
+
+function highlightItem(items) {
+  items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+}
+
+function selectTown(town) {
+  document.getElementById('location').value = town;
+  document.getElementById('autocomplete-list').classList.remove('open');
+  document.getElementById('autocomplete-list').innerHTML = '';
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.input-group')) {
+    document.getElementById('autocomplete-list').classList.remove('open');
+  }
+});
+
+// LOG
+function log(msg, type='info') {
+  const el = document.getElementById('log');
+  const time = new Date().toTimeString().slice(0,8);
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  line.textContent = `[${time}] ${msg}`;
+  el.prepend(line);
+}
+
+function setStatus(text, color) {
+  document.getElementById('status-text').textContent = text;
+  document.getElementById('status-text').style.color = color;
+  document.getElementById('status-dot').style.background = color;
+  document.getElementById('status-dot').style.boxShadow = `0 0 8px ${color}`;
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('progress-bar-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = label;
+}
+
+function updateStats() {
+  document.getElementById('stat-total').textContent = leads.length;
+  document.getElementById('stat-emails').textContent = leads.filter(l => l.email).length;
+  document.getElementById('stat-sites').textContent = leads.filter(l => l.website).length;
+  document.getElementById('stat-hot').textContent = leads.filter(l => l.lead_temp === 'HOT').length;
+}
+
+function getLeadTemp(biz) {
+  if (!biz.website && !biz.email) return 'HOT';
+  if (biz.email) return 'WARM';
+  return 'COLD';
+}
+
+async function findEmailFromWebsite(url) {
+  if (!url) return '';
+  try {
+    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const res = await fetch(proxy, { signal: AbortSignal.timeout(6000) });
+    const data = await res.json();
+    const html = data.contents || '';
+    const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+    const matches = html.match(emailRegex) || [];
+    return matches.filter(e => !e.includes('example') && !e.includes('sentry') && !e.includes('schema') && e.length < 60)[0] || '';
+  } catch { return ''; }
+}
+
+async function saveToSupabase(lead) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/scout_leads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(lead)
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+function renderTable() {
+  const tbody = document.getElementById('leads-table');
+  if (leads.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><span class="icon">⬡</span>NO LEADS YET</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = leads.map((l, i) => `
+    <tr>
+      <td style="color:rgba(192,200,216,0.3)">${i+1}</td>
+      <td style="color:#fff;font-weight:bold">${l.name||'—'}</td>
+      <td style="color:rgba(192,200,216,0.5);font-size:10px">${l.address||'—'}</td>
+      <td style="color:rgba(192,200,216,0.6)">${l.phone||'—'}</td>
+      <td>${l.email?`<span class="badge email-yes">✓ ${l.email}</span>`:'<span class="badge email-no">NONE</span>'}</td>
+      <td>${l.website?`<a href="${l.website}" target="_blank" style="color:var(--blue);text-decoration:none;font-size:10px">↗ VISIT</a>`:'<span style="color:rgba(192,200,216,0.2)">NONE</span>'}</td>
+      <td><span class="badge ${l.lead_temp?.toLowerCase()}">${l.lead_temp||'—'}</span></td>
+      <td>${l.saved?'<span style="color:var(--green);font-size:10px">✓ DB</span>':'<span style="color:rgba(192,200,216,0.2);font-size:10px">—</span>'}</td>
+    </tr>`).join('');
+}
+
+async function startScan() {
+  if (scanning) return;
+  const location = document.getElementById('location').value.trim();
+  const niche = document.getElementById('niche').value;
+  if (!location) { log('No location selected', 'error'); return; }
+  if (!niche) { log('No niche selected', 'error'); return; }
+
+  scanning = true; leads = [];
+  document.getElementById('scan-btn').disabled = true;
+  setStatus('SCANNING', 'var(--blue)');
+  log(`SCOUT initiated — ${location} / ${niche}`, 'info');
+
+  try {
+    setProgress(10, 'SCOUT CONNECTING TO BIZDATA...');
+    const url = `${BIZDATA_URL}?location=${encodeURIComponent(location)}&category=${niche}&limit=500`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const businesses = data.businesses || [];
+    log(`BizData returned ${businesses.length} businesses`, 'success');
+
+    if (businesses.length === 0) {
+      log('No businesses found', 'warn');
+      setStatus('NO RESULTS', 'var(--amber)');
+      scanning = false;
+      document.getElementById('scan-btn').disabled = false;
+      return;
+    }
+
+    for (let i = 0; i < businesses.length; i++) {
+      const biz = businesses[i];
+      const pct = Math.round(((i+1)/businesses.length)*100);
+      setProgress(pct, `PROCESSING ${i+1} OF ${businesses.length} — ${biz.name||'Unknown'}`);
+
+      let email = biz.email || '';
+      if (!email && biz.website) {
+        log(`Scanning website: ${biz.name}`, 'info');
+        email = await findEmailFromWebsite(biz.website);
+        if (email) log(`Email found: ${email}`, 'success');
+      }
+
+      const lead = {
+        name: biz.name||'', address: biz.address||'', phone: biz.phone||'',
+        website: biz.website||'', email, niche, location,
+        lead_temp: getLeadTemp({...biz, email}),
+        email_found: !!email,
+        created_at: new Date().toISOString()
+      };
+
+      const saved = await saveToSupabase(lead);
+      lead.saved = saved;
+      leads.push(lead);
+      updateStats();
+      renderTable();
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    setStatus('SCAN COMPLETE', 'var(--green)');
+    setProgress(100, `COMPLETE — ${leads.length} leads processed`);
+    log(`SCOUT done. ${leads.filter(l=>l.email).length} emails. ${leads.filter(l=>l.lead_temp==='HOT').length} hot leads.`, 'success');
+
+  } catch(err) {
+    log(`Error: ${err.message}`, 'error');
+    setStatus('ERROR', 'var(--red)');
+  }
+
+  scanning = false;
+  document.getElementById('scan-btn').disabled = false;
+}
+
+function exportCSV() {
+  if (leads.length === 0) { log('No leads to export', 'warn'); return; }
+  const headers = ['Name','Address','Phone','Email','Website','Niche','Location','Lead Temp'];
+  const rows = leads.map(l => [`"${l.name}"`,`"${l.address}"`,`"${l.phone}"`,`"${l.email}"`,`"${l.website}"`,`"${l.niche}"`,`"${l.location}"`,`"${l.lead_temp}"`]);
+  const csv = [headers,...rows].map(r=>r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = `SCOUT_${document.getElementById('location').value}_${Date.now()}.csv`;
+  a.click();
+  log('CSV exported', 'success');
+}
+</script>
+</body>
+</html>

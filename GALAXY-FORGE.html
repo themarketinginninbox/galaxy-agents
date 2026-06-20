@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GALAXY // 🔴 FORGE</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --forge:#FF3355;--forge-dim:rgba(255,51,85,0.12);
+  --gold:#FFD700;--blue:#4AB3FF;--green:#00FF88;
+  --amber:#FFAA00;--silver:#C0C8D8;
+  --bg:#010208;--panel:rgba(10,15,30,0.9);--border:rgba(255,51,85,0.15);
+}
+body{background:var(--bg);color:var(--silver);font-family:'Share Tech Mono',monospace;min-height:100vh;padding:20px}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border:1px solid var(--border);border-radius:8px;margin-bottom:20px;background:var(--panel)}
+.logo{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:4px;color:rgba(192,200,216,0.4)}
+.logo span{color:var(--forge);font-size:18px;font-weight:900;display:block;letter-spacing:6px}
+#status-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);display:inline-block;margin-right:8px}
+#status-text{font-size:10px;letter-spacing:2px;color:var(--amber)}
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;text-align:center}
+.stat-card .val{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700;display:block}
+.stat-card .lbl{font-size:8px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-top:2px;display:block}
+.controls{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px;display:flex;flex-direction:column;gap:12px}
+.controls h3{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;color:var(--forge)}
+.ctrl-row{display:flex;gap:12px;align-items:flex-end}
+.input-group{display:flex;flex-direction:column;gap:4px;flex:1}
+label{font-size:9px;letter-spacing:2px;color:var(--blue);text-transform:uppercase}
+select{background:rgba(1,2,8,0.8);border:1px solid rgba(255,51,85,0.2);border-radius:4px;padding:10px 14px;color:var(--silver);font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;width:100%}
+select:focus{border-color:var(--forge)}
+select option{background:#0a0f1e}
+.forge-btn{width:100%;padding:14px;background:transparent;border:1px solid var(--forge);border-radius:4px;color:var(--forge);font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:3px;cursor:pointer;transition:all 0.2s;margin-top:4px}
+.forge-btn:hover{background:var(--forge-dim);box-shadow:0 0 16px rgba(255,51,85,0.3)}
+.forge-btn:disabled{opacity:0.4;cursor:not-allowed}
+#progress-wrap{margin-bottom:20px;display:none}
+#progress-label{font-size:9px;color:var(--forge);letter-spacing:1px;margin-bottom:6px}
+#progress-bar-bg{background:rgba(255,51,85,0.1);border-radius:2px;height:3px;overflow:hidden}
+#progress-bar-fill{height:100%;background:var(--forge);border-radius:2px;width:0%;transition:width 0.3s;box-shadow:0 0 8px var(--forge)}
+#log{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:20px;height:90px;overflow-y:auto;font-size:9px}
+.log-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.log-line.info{color:var(--blue)}.log-line.success{color:var(--green)}.log-line.warn{color:var(--amber)}.log-line.error{color:var(--forge)}
+.table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
+.table-header h2{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--forge)}
+table{width:100%;border-collapse:collapse;font-size:10px}
+th{text-align:left;padding:8px 12px;font-size:7px;letter-spacing:2px;color:rgba(192,200,216,0.4);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:hover td{background:rgba(255,51,85,0.03)}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:7px;letter-spacing:1px;border:1px solid}
+.badge.queued{color:var(--amber);border-color:var(--amber)}
+.badge.building{color:var(--blue);border-color:var(--blue)}
+.badge.saved{color:var(--green);border-color:var(--green)}
+.badge.failed{color:var(--forge);border-color:var(--forge)}
+.badge.hot{color:var(--amber);border-color:var(--amber)}
+.badge.warm{color:var(--blue);border-color:var(--blue)}
+.badge.cold{color:rgba(192,200,216,0.4);border-color:rgba(192,200,216,0.2)}
+.empty-state{text-align:center;padding:40px 20px;color:rgba(192,200,216,0.3);font-size:11px;letter-spacing:2px}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:rgba(255,51,85,0.3);border-radius:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">GALAXY SYSTEM<span>🔴 FORGE</span></div>
+  <div><span id="status-dot"></span><span id="status-text">STANDING BY</span></div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-card"><span class="val" id="stat-queued" style="color:var(--amber)">0</span><span class="lbl">IN QUEUE</span></div>
+  <div class="stat-card"><span class="val" id="stat-building" style="color:var(--blue)">0</span><span class="lbl">BUILDING</span></div>
+  <div class="stat-card"><span class="val" id="stat-saved" style="color:var(--green)">0</span><span class="lbl">SAVED TO DB</span></div>
+  <div class="stat-card"><span class="val" id="stat-failed" style="color:var(--forge)">0</span><span class="lbl">FAILED</span></div>
+</div>
+
+<div class="controls">
+  <h3>⬡ Build Configuration</h3>
+  <div class="ctrl-row">
+    <div class="input-group">
+      <label>Lead Priority</label>
+      <select id="lead-filter">
+        <option value="all">All unbuilt leads</option>
+        <option value="HOT">HOT leads only</option>
+        <option value="WARM">WARM leads only</option>
+      </select>
+    </div>
+    <div class="input-group">
+      <label>Max Builds</label>
+      <select id="max-builds">
+        <option value="5">5 sites</option>
+        <option value="10" selected>10 sites</option>
+        <option value="25">25 sites</option>
+        <option value="50">50 sites</option>
+        <option value="999">All</option>
+      </select>
+    </div>
+  </div>
+  <button class="forge-btn" id="forge-btn" onclick="startForge()">🔴 INITIATE FORGE</button>
+</div>
+
+<div id="progress-wrap">
+  <div id="progress-label">FORGE BUILDING... 0%</div>
+  <div id="progress-bar-bg"><div id="progress-bar-fill"></div></div>
+</div>
+
+<div id="log"></div>
+
+<div class="table-wrap">
+  <div class="table-header">
+    <h2>BUILD QUEUE</h2>
+    <span style="font-size:9px;color:rgba(192,200,216,0.3);letter-spacing:2px">AUTO SAVES → forge_output</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Business</th><th>Location</th><th>Niche</th><th>Temp</th><th>Status</th></tr>
+      </thead>
+      <tbody id="queue-table">
+        <tr><td colspan="6"><div class="empty-state">⬡ AWAITING FORGE INITIATION</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://uklrgpommxqmdvetfxmc.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrbHJncG9tbXhxbWR2ZXRmeG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjQ2MTEsImV4cCI6MjA5NzQwMDYxMX0.xuKX88Hn4Wa_xLuLBrp7SsIsdlbiKbksRwYKwVKr5zI';
+
+const NICHE_CONFIG = {
+  restaurant:{tagline:'Fine Dining · Curated Experiences · Seasonal Menu',color:'#C9A84C'},
+  cafe:{tagline:'Artisan Coffee · Fresh Food · Warm Atmosphere',color:'#A0784C'},
+  bar:{tagline:'Craft Drinks · Great Vibes · Memorable Nights',color:'#C9A84C'},
+  hairdresser:{tagline:'Expert Cuts · Premium Styling · You Deserve the Best',color:'#C9A84C'},
+  pharmacy:{tagline:'Your Health · Our Priority · Expert Care',color:'#4AB3FF'},
+  beauty:{tagline:'Beauty · Wellness · Confidence',color:'#C9A84C'},
+  dentist:{tagline:'Healthy Smiles · Expert Care · Modern Dentistry',color:'#4AB3FF'},
+  gym:{tagline:'Strength · Fitness · Results',color:'#FF3355'},
+  default:{tagline:'Quality Service · Local Business · Trusted by the Community',color:'#C9A84C'}
+};
+
+let queue=[], forging=false;
+
+function log(msg,type='info'){
+  const el=document.getElementById('log');
+  const time=new Date().toTimeString().slice(0,8);
+  const line=document.createElement('div');
+  line.className=`log-line ${type}`;
+  line.textContent=`[${time}] ${msg}`;
+  el.prepend(line);
+}
+
+function setStatus(text,color){
+  document.getElementById('status-text').textContent=text;
+  document.getElementById('status-text').style.color=color;
+  document.getElementById('status-dot').style.background=color;
+  document.getElementById('status-dot').style.boxShadow=`0 0 8px ${color}`;
+}
+
+function setProgress(pct,label){
+  document.getElementById('progress-wrap').style.display='block';
+  document.getElementById('progress-bar-fill').style.width=pct+'%';
+  document.getElementById('progress-label').textContent=label;
+}
+
+function updateStats(){
+  document.getElementById('stat-queued').textContent=queue.filter(i=>i.status==='queued').length;
+  document.getElementById('stat-building').textContent=queue.filter(i=>i.status==='building').length;
+  document.getElementById('stat-saved').textContent=queue.filter(i=>i.status==='saved').length;
+  document.getElementById('stat-failed').textContent=queue.filter(i=>i.status==='failed').length;
+}
+
+function renderQueue(){
+  const tbody=document.getElementById('queue-table');
+  if(!queue.length){tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state">⬡ NO LEADS IN QUEUE</div></td></tr>`;return}
+  tbody.innerHTML=queue.map((item,i)=>`
+    <tr>
+      <td style="color:rgba(192,200,216,0.3)">${i+1}</td>
+      <td style="color:#fff">${item.lead.name||'—'}</td>
+      <td style="color:rgba(192,200,216,0.5);font-size:9px">${item.lead.location||'—'}</td>
+      <td style="color:rgba(192,200,216,0.5);font-size:9px">${item.lead.niche||'—'}</td>
+      <td><span class="badge ${item.lead.lead_temp?.toLowerCase()}">${item.lead.lead_temp||'—'}</span></td>
+      <td><span class="badge ${item.status}">${item.status.toUpperCase()}</span></td>
+    </tr>`).join('');
+}
+
+async function sbGet(table,params=''){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`,{
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+  });
+  return res.json();
+}
+
+async function sbInsert(table,data){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/${table}`,{
+    method:'POST',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify(data)
+  });
+  const result=await res.json();
+  return Array.isArray(result)?result[0]:result;
+}
+
+async function sbUpdate(table,id,data){
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`,{
+    method:'PATCH',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},
+    body:JSON.stringify(data)
+  });
+}
+
+function buildHTML(lead){
+  const niche=lead.niche||'restaurant';
+  const cfg=NICHE_CONFIG[niche]||NICHE_CONFIG.default;
+  const year=(new Date().getFullYear()-Math.floor(Math.random()*8+2)).toString();
+
+  const template=`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${lead.name||'Restaurant'} — Fine Dining</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:${cfg.color};--black:#060404;--deep:#0e0a08;--cream:#F5EDD8;--cream-dim:rgba(245,237,216,0.6);--border:rgba(201,168,76,0.2);--ember:#8B1A1A}
+html{scroll-behavior:smooth}
+body{background:var(--black);color:var(--cream);font-family:'Inter',sans-serif;font-weight:300;overflow-x:hidden}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:24px 48px;transition:all 0.5s}
+nav.scrolled{background:rgba(6,4,4,0.96);backdrop-filter:blur(20px);padding:16px 48px;border-bottom:1px solid var(--border)}
+.nav-logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;letter-spacing:4px;color:var(--gold);text-transform:uppercase}
+.nav-links{display:flex;gap:40px;list-style:none}
+.nav-links a{font-size:11px;letter-spacing:3px;color:var(--cream-dim);text-decoration:none;text-transform:uppercase;transition:color 0.3s}
+.nav-links a:hover{color:var(--gold)}
+.nav-reserve{font-size:11px;letter-spacing:3px;color:var(--gold);text-decoration:none;text-transform:uppercase;border:1px solid var(--border);padding:10px 20px;transition:all 0.3s}
+.nav-reserve:hover{background:var(--gold);color:var(--black)}
+#hero{position:relative;height:100vh;min-height:700px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#hero-canvas{position:absolute;inset:0;z-index:0}
+.hero-overlay{position:absolute;inset:0;z-index:1;background:radial-gradient(ellipse at center,rgba(6,4,4,0.3) 0%,rgba(6,4,4,0.75) 70%,rgba(6,4,4,0.95) 100%)}
+.hero-content{position:relative;z-index:2;text-align:center;padding:0 24px}
+.hero-eyebrow{font-size:10px;letter-spacing:8px;color:var(--gold);text-transform:uppercase;margin-bottom:28px;opacity:0;animation:fadeUp 1s 0.3s forwards}
+.hero-title{font-family:'Cormorant Garamond',serif;font-size:clamp(48px,10vw,110px);font-weight:300;line-height:0.95;letter-spacing:-2px;margin-bottom:28px;opacity:0;animation:fadeUp 1s 0.6s forwards}
+.hero-title em{font-style:italic;color:var(--gold)}
+.hero-sub{font-size:13px;letter-spacing:3px;color:var(--cream-dim);text-transform:uppercase;margin-bottom:52px;opacity:0;animation:fadeUp 1s 0.9s forwards}
+.hero-cta{display:inline-flex;align-items:center;gap:16px;opacity:0;animation:fadeUp 1s 1.2s forwards}
+.btn-primary{display:inline-block;padding:16px 36px;background:var(--gold);color:var(--black);font-size:11px;letter-spacing:3px;text-transform:uppercase;text-decoration:none;font-weight:500;transition:all 0.3s}
+.btn-ghost{display:inline-block;padding:15px 36px;border:1px solid var(--border);color:var(--cream-dim);font-size:11px;letter-spacing:3px;text-transform:uppercase;text-decoration:none;transition:all 0.3s}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+.hero-scroll{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);z-index:2;display:flex;flex-direction:column;align-items:center;gap:12px;opacity:0;animation:fadeUp 1s 1.8s forwards}
+.hero-scroll span{font-size:8px;letter-spacing:4px;color:rgba(245,237,216,0.3);text-transform:uppercase}
+.scroll-line{width:1px;height:60px;background:linear-gradient(to bottom,var(--gold),transparent);animation:scrollLine 2s infinite}
+@keyframes scrollLine{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform:scaleY(1);transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+section{padding:120px 48px}
+.section-eyebrow{font-size:9px;letter-spacing:6px;color:var(--gold);text-transform:uppercase;margin-bottom:20px;display:block}
+.section-title{font-family:'Cormorant Garamond',serif;font-size:clamp(36px,6vw,72px);font-weight:300;line-height:1.05;margin-bottom:24px}
+.section-title em{font-style:italic;color:var(--gold)}
+.section-body{font-size:15px;line-height:1.85;color:var(--cream-dim);max-width:520px}
+.gold-divider{width:60px;height:1px;background:var(--gold);margin:24px 0}
+.gold-divider.center{margin:24px auto}
+#about{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;border-top:1px solid var(--border)}
+.about-visual{position:relative;height:560px}
+.about-img-main{position:absolute;top:0;right:0;width:78%;height:85%;background:linear-gradient(135deg,#1a0f0a,#2d1810,#1a0f0a);overflow:hidden}
+.about-img-main::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 30% 40%,rgba(201,168,76,0.15),transparent 60%)}
+.about-img-accent{position:absolute;bottom:0;left:0;width:55%;height:55%;background:linear-gradient(135deg,#0e0a08,#1f1008);border:1px solid var(--border)}
+.about-img-accent::after{content:'EST. ${year}';position:absolute;bottom:20px;left:20px;font-size:8px;letter-spacing:4px;color:var(--gold)}
+.about-line{position:absolute;top:40px;left:0;width:1px;height:200px;background:linear-gradient(to bottom,transparent,var(--gold),transparent)}
+.about-stats{display:flex;gap:40px;margin-top:48px;padding-top:40px;border-top:1px solid var(--border)}
+.stat-num{font-family:'Cormorant Garamond',serif;font-size:42px;font-weight:300;color:var(--gold);display:block;line-height:1}
+.stat-lbl{font-size:9px;letter-spacing:3px;color:rgba(245,237,216,0.4);text-transform:uppercase;margin-top:6px;display:block}
+#menu{background:var(--deep);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.menu-header{text-align:center;margin-bottom:72px}
+.menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);max-width:1100px;margin:0 auto}
+.menu-item{background:var(--deep);padding:48px 36px;transition:background 0.4s;position:relative;overflow:hidden}
+.menu-item::before{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--gold);transform:scaleX(0);transition:transform 0.4s}
+.menu-item:hover{background:rgba(201,168,76,0.04)}
+.menu-item:hover::before{transform:scaleX(1)}
+.menu-course{font-size:8px;letter-spacing:4px;color:var(--gold);text-transform:uppercase;margin-bottom:16px;display:block}
+.menu-name{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:300;font-style:italic;margin-bottom:12px;line-height:1.2}
+.menu-desc{font-size:12px;line-height:1.7;color:rgba(245,237,216,0.45);margin-bottom:20px}
+.menu-price{font-size:13px;letter-spacing:2px;color:var(--gold)}
+#experience{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;min-height:600px}
+.exp-visual{position:relative;background:linear-gradient(135deg,#100808,#1e0e0a);overflow:hidden;display:flex;align-items:center;justify-content:center}
+.exp-glow{position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(139,26,26,0.3),transparent 70%);top:50%;left:50%;transform:translate(-50%,-50%);animation:breathe 4s infinite}
+@keyframes breathe{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.2)}}
+.exp-visual-inner{position:relative;z-index:1;text-align:center;padding:60px}
+.exp-quote{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;font-style:italic;line-height:1.5;color:var(--cream);margin-bottom:24px}
+.exp-quote-attr{font-size:9px;letter-spacing:4px;color:var(--gold);text-transform:uppercase}
+.exp-content{padding:100px 72px;display:flex;flex-direction:column;justify-content:center;border-left:1px solid var(--border)}
+.exp-list{list-style:none;margin-top:40px}
+.exp-list li{padding:24px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:20px;font-size:13px;color:var(--cream-dim)}
+.exp-num{font-family:'Cormorant Garamond',serif;font-size:11px;color:var(--gold);letter-spacing:2px;flex-shrink:0}
+#reserve{text-align:center;background:radial-gradient(ellipse at center,rgba(139,26,26,0.12) 0%,transparent 70%);border-top:1px solid var(--border)}
+#reserve .section-body{margin:0 auto 48px;text-align:center;max-width:480px}
+.reserve-form{display:flex;flex-direction:column;gap:16px;max-width:480px;margin:0 auto}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-field{background:transparent;border:1px solid var(--border);padding:16px 20px;color:var(--cream);font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:border-color 0.3s;width:100%}
+.form-field::placeholder{color:rgba(245,237,216,0.3);font-size:12px;letter-spacing:2px}
+.form-field:focus{border-color:var(--gold)}
+.btn-primary.full{width:100%;text-align:center;border:none;cursor:pointer;font-family:'Inter',sans-serif}
+footer{padding:60px 48px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.footer-logo{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:300;letter-spacing:4px;color:var(--gold)}
+.footer-address{font-size:11px;letter-spacing:2px;color:rgba(245,237,216,0.3);text-align:center;line-height:1.8}
+.footer-links{display:flex;gap:28px}
+.footer-links a{font-size:10px;letter-spacing:2px;color:rgba(245,237,216,0.35);text-decoration:none;text-transform:uppercase}
+.footer-links a:hover{color:var(--gold)}
+.reveal{opacity:0;transform:translateY(40px);transition:opacity 0.8s ease,transform 0.8s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-left{opacity:0;transform:translateX(-40px);transition:opacity 0.8s ease,transform 0.8s ease}
+.reveal-left.visible{opacity:1;transform:translateX(0)}
+.reveal-right{opacity:0;transform:translateX(40px);transition:opacity 0.8s ease,transform 0.8s ease}
+.reveal-right.visible{opacity:1;transform:translateX(0)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:768px){nav{padding:20px 24px}.nav-links,.nav-reserve{display:none}section{padding:80px 24px}#about{grid-template-columns:1fr;gap:48px}.about-visual{height:320px}.menu-grid{grid-template-columns:1fr}#experience{grid-template-columns:1fr}.exp-content{padding:60px 24px;border-left:none;border-top:1px solid var(--border)}footer{flex-direction:column;gap:24px;text-align:center}.form-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav id="nav">
+  <div class="nav-logo">${lead.name||'Restaurant'}</div>
+  <ul class="nav-links"><li><a href="#about">Our Story</a></li><li><a href="#menu">Menu</a></li><li><a href="#experience">Experience</a></li></ul>
+  <a href="#reserve" class="nav-reserve">Reserve a Table</a>
+</nav>
+<section id="hero">
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Est. ${year} &nbsp;·&nbsp; ${lead.location||'UK'}</p>
+    <h1 class="hero-title">Where Every<br>Meal Becomes<br><em>a Memory</em></h1>
+    <p class="hero-sub">${cfg.tagline}</p>
+    <div class="hero-cta"><a href="#reserve" class="btn-primary">Reserve Your Table</a><a href="#menu" class="btn-ghost">View Menu</a></div>
+  </div>
+  <div class="hero-scroll"><span>Discover</span><div class="scroll-line"></div></div>
+</section>
+<section id="about">
+  <div class="about-visual reveal-left"><div class="about-line"></div><div class="about-img-main"></div><div class="about-img-accent"></div></div>
+  <div class="reveal-right">
+    <span class="section-eyebrow">Our Philosophy</span>
+    <h2 class="section-title">Food is the<br><em>language of love</em></h2>
+    <div class="gold-divider"></div>
+    <p class="section-body">At ${lead.name||'our restaurant'}, we believe that a truly exceptional meal transcends the plate. Every dish is crafted with intention — seasonal ingredients sourced locally, and a warmth of service that makes you feel at home in ${lead.location||'our city'}.</p>
+    <div class="about-stats"><div><span class="stat-num">12</span><span class="stat-lbl">Signature Dishes</span></div><div><span class="stat-num">7</span><span class="stat-lbl">Years of Craft</span></div><div><span class="stat-num">∞</span><span class="stat-lbl">Memories Made</span></div></div>
+  </div>
+</section>
+<section id="menu">
+  <div class="menu-header reveal"><span class="section-eyebrow">Culinary Selection</span><h2 class="section-title">The <em>Menu</em></h2><div class="gold-divider center"></div><p style="font-size:13px;color:rgba(245,237,216,0.4);letter-spacing:2px;text-transform:uppercase">Seasonal · Locally Sourced · Crafted Daily</p></div>
+  <div class="menu-grid">
+    <div class="menu-item reveal"><span class="menu-course">Starter</span><div class="menu-name">Seared Scallops & Truffle Foam</div><p class="menu-desc">Orkney scallops, cauliflower purée, micro herbs, aged balsamic</p><span class="menu-price">£18</span></div>
+    <div class="menu-item reveal"><span class="menu-course">Main Course</span><div class="menu-name">Dry-Aged Rib Eye & Bone Marrow</div><p class="menu-desc">28-day aged prime rib, roasted garlic mash, red wine reduction</p><span class="menu-price">£42</span></div>
+    <div class="menu-item reveal"><span class="menu-course">Dessert</span><div class="menu-name">Dark Chocolate Délice</div><p class="menu-desc">Valrhona 72% chocolate, salted caramel, hazelnut praline</p><span class="menu-price">£12</span></div>
+    <div class="menu-item reveal"><span class="menu-course">Starter</span><div class="menu-name">Burrata & Heritage Tomato</div><p class="menu-desc">Fresh burrata, heirloom tomatoes, aged balsamic, Maldon sea salt</p><span class="menu-price">£14</span></div>
+    <div class="menu-item reveal"><span class="menu-course">Main Course</span><div class="menu-name">Pan-Roasted Duck Breast</div><p class="menu-desc">Gressingham duck, cherry jus, celeriac purée, crispy kale</p><span class="menu-price">£36</span></div>
+    <div class="menu-item reveal"><span class="menu-course">Chef's Selection</span><div class="menu-name">Tasting Menu <em>7 Courses</em></div><p class="menu-desc">An intimate journey through our kitchen — wine pairing available</p><span class="menu-price">£95 pp</span></div>
+  </div>
+</section>
+<section id="experience" style="padding:0">
+  <div class="exp-visual"><div class="exp-glow"></div><div class="exp-visual-inner"><p class="exp-quote">"To eat is a necessity,<br>but to eat intelligently<br>is an art."</p><p class="exp-quote-attr">— François de La Rochefoucauld</p></div></div>
+  <div class="exp-content reveal-right">
+    <span class="section-eyebrow">The Experience</span>
+    <h2 class="section-title">Beyond the<br><em>Plate</em></h2>
+    <div class="gold-divider"></div>
+    <p class="section-body">Every detail at ${lead.name||'our restaurant'} has been considered. A sanctuary for those who appreciate the finer things in ${lead.location||'our city'}.</p>
+    <ul class="exp-list"><li><span class="exp-num">01</span>Private dining available for up to 12 guests</li><li><span class="exp-num">02</span>Curated wine cellar with over 200 labels</li><li><span class="exp-num">03</span>Seasonal tasting menus changing monthly</li><li><span class="exp-num">04</span>Chef's table — watch the magic unfold</li></ul>
+  </div>
+</section>
+<section id="reserve">
+  <span class="section-eyebrow">Reservations</span>
+  <h2 class="section-title reveal">Secure Your<br><em>Evening</em></h2>
+  <div class="gold-divider center"></div>
+  <p class="section-body reveal">Tables fill quickly. We recommend booking at least 48 hours in advance.</p>
+  <div class="reserve-form reveal">
+    <div class="form-row"><input type="text" class="form-field" placeholder="Your Name"><input type="email" class="form-field" placeholder="Email Address"></div>
+    <div class="form-row"><input type="date" class="form-field"><input type="text" class="form-field" placeholder="Number of Guests"></div>
+    <input type="text" class="form-field" placeholder="Special Requests (optional)">
+    <button class="btn-primary full">Request Reservation at ${lead.name||'Our Restaurant'}</button>
+  </div>
+  <p style="margin-top:24px;font-size:11px;letter-spacing:2px;color:rgba(245,237,216,0.25)">Or call us: ${lead.phone||'Contact us to book'}</p>
+</section>
+<footer>
+  <div class="footer-logo">${lead.name||'Restaurant'}</div>
+  <div class="footer-address">${lead.address||''}<br><span style="color:var(--gold)">${lead.email||''}</span></div>
+  <div class="footer-links"><a href="#">Instagram</a><a href="#">Facebook</a><a href="#">Google</a></div>
+</footer>
+<script>
+const nav=document.getElementById('nav');
+window.addEventListener('scroll',()=>nav.classList.toggle('scrolled',window.scrollY>80));
+const hc=document.getElementById('hero-canvas'),ctx=hc.getContext('2d');
+let W,H,P=[];
+function resize(){W=hc.width=window.innerWidth;H=hc.height=window.innerHeight}resize();window.addEventListener('resize',resize);
+class E{constructor(){this.r()}r(){this.x=Math.random()*W;this.y=H+20;this.s=Math.random()*2+0.5;this.sy=-(Math.random()*0.8+0.3);this.sx=(Math.random()-0.5)*0.4;this.l=1;this.d=Math.random()*0.003+0.001;this.g=Math.random()>0.6}u(){this.x+=this.sx+Math.sin(Date.now()*0.001+this.x)*0.2;this.y+=this.sy;this.l-=this.d;if(this.l<=0||this.y<-20)this.r()}draw(){ctx.beginPath();ctx.arc(this.x,this.y,this.s,0,Math.PI*2);const c=this.g?'rgba(201,168,76,':'rgba(139,26,26,';ctx.fillStyle=c+this.l+')';ctx.shadowColor=c+'0.8)';ctx.shadowBlur=6;ctx.fill()}}
+for(let i=0;i<180;i++){const p=new E();p.y=Math.random()*H;p.l=Math.random();P.push(p)}
+function draw(){ctx.clearRect(0,0,W,H);P.forEach(p=>{p.u();p.draw()});ctx.shadowBlur=0;requestAnimationFrame(draw)}draw();
+const obs=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting)x.target.classList.add('visible')})},{threshold:0.1});
+document.querySelectorAll('.reveal,.reveal-left,.reveal-right').forEach(el=>obs.observe(el));
+<\/script>
+</body>
+</html>`;
+  return template;
+}
+
+async function startForge(){
+  if(forging)return;
+  forging=true;
+  queue=[];
+  document.getElementById('forge-btn').disabled=true;
+  setStatus('FETCHING LEADS','var(--blue)');
+  log('FORGE initiated — fetching leads from Supabase','info');
+
+  try{
+    const filter=document.getElementById('lead-filter').value;
+    const max=parseInt(document.getElementById('max-builds').value);
+    let params=`select=*&order=created_at.desc&limit=${max}`;
+    if(filter!=='all')params+=`&lead_temp=eq.${filter}`;
+
+    const leads=await sbGet('scout_leads',params);
+    if(!leads.length){
+      log('No leads found — run SCOUT first','warn');
+      setStatus('NO LEADS','var(--amber)');
+      forging=false;
+      document.getElementById('forge-btn').disabled=false;
+      return;
+    }
+
+    log(`${leads.length} leads loaded — beginning builds`,'success');
+    queue=leads.map(lead=>({lead,status:'queued',forgeId:null}));
+    renderQueue();updateStats();
+
+    for(let i=0;i<queue.length;i++){
+      const item=queue[i];
+      const pct=Math.round(((i+1)/queue.length)*100);
+      setProgress(pct,`FORGE BUILDING ${i+1} OF ${queue.length} — ${item.lead.name}`);
+      setStatus('BUILDING','var(--forge)');
+      item.status='building';
+      renderQueue();updateStats();
+
+      try{
+        const html=buildHTML(item.lead);
+        // Save to forge_output in Supabase
+        const saved=await sbInsert('forge_output',{
+          lead_id:item.lead.id,
+          business_name:item.lead.name,
+          html:html,
+          status:'ready'
+        });
+        item.forgeId=saved?.id;
+        item.status='saved';
+        log(`Built & saved: ${item.lead.name}`,'success');
+      }catch(e){
+        item.status='failed';
+        log(`Failed: ${item.lead.name} — ${e.message}`,'error');
+      }
+
+      renderQueue();updateStats();
+      await new Promise(r=>setTimeout(r,300));
+    }
+
+    setStatus('FORGE COMPLETE','var(--green)');
+    setProgress(100,`FORGE COMPLETE — ${queue.filter(i=>i.status==='saved').length} sites saved to database`);
+    log(`FORGE done. ${queue.filter(i=>i.status==='saved').length} sites ready in forge_output → LAUNCH can now deploy.`,'success');
+
+  }catch(err){
+    log(`FORGE error: ${err.message}`,'error');
+    setStatus('ERROR','var(--forge)');
+  }
+
+  forging=false;
+  document.getElementById('forge-btn').disabled=false;
+}
+</script>
+</body>
+</html>
