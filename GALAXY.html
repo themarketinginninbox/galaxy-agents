@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GALAXY — Command Centre</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --galaxy:#00B4D8;
+  --sentinel:#E0E8FF;
+  --sam:#9B59B6;
+  --scout:#4AB3FF;
+  --forge:#FF3355;
+  --launch:#00FF88;
+  --scanner:#2C2C2C;
+  --dispatch:#FFAA00;
+  --bg:#010208;--panel:rgba(6,10,24,0.93);--border:rgba(74,179,255,0.18);
+  --silver:#C0C8D8;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--silver);touch-action:none}
+
+#three-canvas{position:fixed;inset:0;z-index:0}
+#conn-canvas{position:fixed;inset:0;z-index:10;pointer-events:none}
+
+#topbar{
+  position:fixed;top:0;left:0;right:0;z-index:50;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:14px 20px;
+  background:linear-gradient(to bottom,rgba(1,2,8,0.96),transparent);
+  pointer-events:none;
+}
+.brand{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;letter-spacing:6px;color:var(--galaxy);text-shadow:0 0 20px rgba(0,180,216,0.4)}
+.sub{font-size:7px;letter-spacing:3px;color:rgba(192,200,216,0.3);display:block;margin-top:2px}
+#live-badge{display:flex;align-items:center;gap:6px;font-size:9px;letter-spacing:2px;color:var(--launch)}
+#live-dot{width:6px;height:6px;border-radius:50%;background:var(--launch);box-shadow:0 0 8px var(--launch);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.25}}
+#clock{font-size:10px;letter-spacing:2px;color:rgba(192,200,216,0.3)}
+
+/* AGENT LABELS */
+.agent-label{position:fixed;z-index:20;text-align:center;cursor:pointer;transform:translate(-50%,-50%);pointer-events:all}
+.agent-box{
+  background:var(--panel);border-radius:8px;
+  padding:8px 12px;backdrop-filter:blur(12px);
+  min-width:80px;transition:all 0.25s;
+  border:1px solid rgba(255,255,255,0.08);
+}
+.agent-label:hover .agent-box{transform:scale(1.1);box-shadow:0 0 20px var(--agent-color,rgba(74,179,255,0.3))}
+.a-gem{font-size:14px;display:block;margin-bottom:3px;line-height:1}
+.a-name{font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:2px;display:block;margin-bottom:2px}
+.a-status{font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.35);display:block}
+.a-dot{width:4px;height:4px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle}
+
+/* PANEL */
+#agent-panel{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.4s}
+#agent-panel.open{opacity:1;pointer-events:all}
+#panel-bg{position:absolute;inset:0;background:rgba(1,2,8,0.82);backdrop-filter:blur(5px)}
+#panel-inner{
+  position:relative;z-index:1;width:calc(100% - 32px);max-width:460px;
+  background:var(--panel);border-radius:16px;overflow:hidden;
+  transform:scale(0.88) translateY(28px);transition:transform 0.4s cubic-bezier(.4,0,.2,1);
+}
+#agent-panel.open #panel-inner{transform:scale(1) translateY(0)}
+
+/* GEM ACCENT BAR */
+#panel-gem-bar{
+  height:4px;
+  background:var(--current-gem-color, var(--galaxy));
+  box-shadow:0 0 12px var(--current-gem-color, var(--galaxy));
+}
+
+#panel-header{padding:18px 18px 14px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between}
+#panel-gem-icon{font-size:28px;margin-right:12px}
+#panel-title{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:900;letter-spacing:4px}
+#panel-role{font-size:8px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-top:4px}
+#close-btn{width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:transparent;color:var(--silver);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+#close-btn:hover{border-color:#FF3355;color:#FF3355}
+#panel-stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,0.04)}
+.pstat{background:var(--panel);padding:16px 14px;text-align:center}
+.pval{font-family:'Orbitron',sans-serif;font-size:24px;font-weight:700;display:block;margin-bottom:4px}
+.plbl{font-size:7px;letter-spacing:2px;color:rgba(192,200,216,0.35)}
+#panel-activity{padding:14px 18px;border-top:1px solid rgba(255,255,255,0.06);max-height:130px;overflow-y:auto}
+#panel-activity h4{font-size:7px;letter-spacing:3px;color:rgba(192,200,216,0.3);margin-bottom:8px}
+.act-line{font-size:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);color:rgba(192,200,216,0.5)}
+.act-line.g{color:rgba(0,255,136,0.7)}.act-line.a{color:rgba(255,170,0,0.7)}.act-line.r{color:rgba(255,51,85,0.7)}
+#panel-speed{padding:12px 18px;border-top:1px solid rgba(255,255,255,0.06)}
+#panel-speed label{font-size:7px;letter-spacing:2px;color:rgba(192,200,216,0.35);display:flex;justify-content:space-between;margin-bottom:6px}
+#panel-speed label span{color:var(--current-gem-color,var(--galaxy))}
+input[type=range]{width:100%;height:3px;-webkit-appearance:none;background:rgba(255,255,255,0.1);border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--current-gem-color,var(--galaxy));box-shadow:0 0 8px var(--current-gem-color,var(--galaxy));cursor:pointer}
+
+#bottombar{
+  position:fixed;bottom:0;left:0;right:0;z-index:50;
+  display:flex;justify-content:space-around;align-items:center;
+  padding:10px 20px 22px;
+  background:linear-gradient(to top,rgba(1,2,8,0.96),transparent);
+  pointer-events:none;
+}
+.bstat{text-align:center}
+.bval{font-family:'Orbitron',sans-serif;font-size:15px;font-weight:700;display:block}
+.blbl{font-size:7px;letter-spacing:1px;color:rgba(192,200,216,0.3)}
+
+::-webkit-scrollbar{width:2px}
+::-webkit-scrollbar-thumb{background:rgba(74,179,255,0.3)}
+</style>
+</head>
+<body>
+<canvas id="three-canvas"></canvas>
+<canvas id="conn-canvas"></canvas>
+
+<div id="topbar">
+  <div><div class="brand">🧠 GALAXY</div><span class="sub">AUTONOMOUS SALES INTELLIGENCE</span></div>
+  <div id="live-badge"><div id="live-dot"></div>LIVE</div>
+  <div id="clock">--:--:--</div>
+</div>
+
+<div id="agent-panel">
+  <div id="panel-bg" onclick="closePanel()"></div>
+  <div id="panel-inner">
+    <div id="panel-gem-bar"></div>
+    <div id="panel-header">
+      <div style="display:flex;align-items:center">
+        <div id="panel-gem-icon"></div>
+        <div><div id="panel-title"></div><div id="panel-role"></div></div>
+      </div>
+      <button id="close-btn" onclick="closePanel()">✕</button>
+    </div>
+    <div id="panel-stats"></div>
+    <div id="panel-activity"><h4>LIVE ACTIVITY</h4><div id="activity-log"></div></div>
+    <div id="panel-speed">
+      <label>AGENT SPEED <span id="speed-val">50%</span></label>
+      <input type="range" min="0" max="100" value="50" oninput="document.getElementById('speed-val').textContent=this.value+'%'">
+    </div>
+    <div style="padding:12px 18px;border-top:1px solid rgba(255,255,255,0.06)">
+      <button id="open-agent-btn" style="width:100%;padding:12px;background:transparent;border:1px solid;border-radius:4px;font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;cursor:pointer;transition:all 0.2s;display:none">OPEN AGENT →</button>
+    </div>
+  </div>
+</div>
+
+<div id="bottombar">
+  <div class="bstat"><span class="bval" id="b-leads" style="color:var(--galaxy)">0</span><span class="blbl">LEADS TODAY</span></div>
+  <div class="bstat"><span class="bval" id="b-sites" style="color:var(--scout)">0</span><span class="blbl">SITES BUILT</span></div>
+  <div class="bstat"><span class="bval" id="b-sent" style="color:var(--launch)">0</span><span class="blbl">EMAILS SENT</span></div>
+  <div class="bstat"><span class="bval" id="b-rev" style="color:var(--dispatch)">£0</span><span class="blbl">REVENUE</span></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const AGENTS = [
+  {
+    id:'GALAXY', gem:'🧠', gemColor:'#00B4D8', level:'brain',
+    role:'Master Brain — Orchestrates Everything',
+    stats:[
+      {val:'7/7',lbl:'AGENTS ONLINE',color:'#00FF88'},
+      {val:'99.8%',lbl:'UPTIME',color:'#00B4D8'},
+      {val:'24/7',lbl:'RUNNING',color:'#00B4D8'},
+      {val:'0',lbl:'ERRORS',color:'#FF3355'}
+    ],
+    activity:[{t:'g',m:'All agents nominal'},{t:'',m:'Pipeline flowing'},{t:'g',m:'DISPATCH: 3/hr'},{t:'',m:'SENTINEL passed'},{t:'g',m:'SAM synced'}]
+  },
+  {
+    id:'SENTINEL', gem:'💎', gemColor:'#E0E8FF', level:'mid',
+    role:'Mid Level — System Engineer',
+    stats:[
+      {val:'1/4',lbl:'DOMAINS ACTIVE',color:'#00FF88'},
+      {val:'9.4',lbl:'AVG HEALTH',color:'#E0E8FF'},
+      {val:'0',lbl:'SPAM FLAGS',color:'#00FF88'},
+      {val:'4h',lbl:'NEXT CHECK',color:'#E0E8FF'}
+    ],
+    activity:[{t:'g',m:'thewebsiteinn.co.uk — 9.8 ✓'},{t:'a',m:'thewebsiteinn.online — warming'},{t:'a',m:'thewebsiteinn.space — warming'},{t:'g',m:'Canary inbox passed ✓'},{t:'',m:'Next check in 4 hours'}]
+  },
+  {
+    id:'SAM', gem:'💜', gemColor:'#9B59B6', level:'mid',
+    role:'Mid Level — Operations & CRM',
+    stats:[
+      {val:'0',lbl:'TOTAL LEADS',color:'#9B59B6'},
+      {val:'0',lbl:'CONFIRMED',color:'#00FF88'},
+      {val:'0',lbl:'CALL LIST',color:'#9B59B6'},
+      {val:'0',lbl:'CLOSED',color:'#FFAA00'}
+    ],
+    activity:[{t:'',m:'Awaiting first SCOUT run'},{t:'g',m:'Supabase connected ✓'},{t:'',m:'Call list: empty'},{t:'a',m:'SAM standing by'}]
+  },
+  {
+    id:'SCOUT', gem:'🔵', gemColor:'#4AB3FF', level:'worker',
+    role:'Worker — Lead Sourcing',
+    stats:[
+      {val:'0',lbl:'LEADS FOUND',color:'#4AB3FF'},
+      {val:'0',lbl:'EMAILS FOUND',color:'#00FF88'},
+      {val:'0',lbl:'HOT LEADS',color:'#FFAA00'},
+      {val:'IDLE',lbl:'STATUS',color:'#4AB3FF'}
+    ],
+    activity:[{t:'',m:'SCOUT standing by'},{t:'g',m:'BizData API ready ✓'},{t:'a',m:'Awaiting scan command'},{t:'',m:'Target: Windsor — Restaurants'}]
+  },
+  {
+    id:'FORGE', gem:'🔴', gemColor:'#FF3355', level:'worker',
+    role:'Worker — Website Builder',
+    stats:[
+      {val:'0',lbl:'SITES BUILT',color:'#FF3355'},
+      {val:'0',lbl:'IN QUEUE',color:'#4AB3FF'},
+      {val:'0',lbl:'FAILED',color:'#FF3355'},
+      {val:'IDLE',lbl:'STATUS',color:'#00FF88'}
+    ],
+    activity:[{t:'',m:'FORGE standing by'},{t:'g',m:'Template 01 loaded ✓'},{t:'g',m:'Claude API connected ✓'},{t:'a',m:'Awaiting leads from SCOUT'}]
+  },
+  {
+    id:'LAUNCH', gem:'🟢', gemColor:'#00FF88', level:'worker',
+    role:'Worker — GitHub Deployer',
+    stats:[
+      {val:'0',lbl:'DEPLOYED',color:'#00FF88'},
+      {val:'0',lbl:'IN QUEUE',color:'#4AB3FF'},
+      {val:'0',lbl:'SCREENSHOTS',color:'#FFAA00'},
+      {val:'IDLE',lbl:'STATUS',color:'#00FF88'}
+    ],
+    activity:[{t:'',m:'LAUNCH standing by'},{t:'g',m:'GitHub API connected ✓'},{t:'',m:'Puppeteer ready'},{t:'a',m:'Awaiting builds from FORGE'}]
+  },
+  {
+    id:'SCANNER', gem:'🖤', gemColor:'#555577', level:'worker',
+    role:'Worker — Quality Gate',
+    stats:[
+      {val:'0',lbl:'APPROVED',color:'#00FF88'},
+      {val:'0',lbl:'REJECTED',color:'#FF3355'},
+      {val:'0',lbl:'ERRORS LOGGED',color:'#FFAA00'},
+      {val:'0%',lbl:'ERROR RATE',color:'#555577'}
+    ],
+    activity:[{t:'',m:'SCANNER standing by'},{t:'',m:'12 quality rules loaded'},{t:'g',m:'Error log ready ✓'},{t:'a',m:'Awaiting sites from LAUNCH'}]
+  },
+  {
+    id:'DISPATCH', gem:'🟠', gemColor:'#FFAA00', level:'worker',
+    role:'Worker — Email Engine',
+    stats:[
+      {val:'0',lbl:'EMAILS SENT',color:'#00FF88'},
+      {val:'0',lbl:'BOUNCED',color:'#FF3355'},
+      {val:'3/hr',lbl:'SEND RATE',color:'#FFAA00'},
+      {val:'1',lbl:'DOMAIN ACTIVE',color:'#FFAA00'}
+    ],
+    activity:[{t:'',m:'DISPATCH standing by'},{t:'g',m:'Instantly.ai connected ✓'},{t:'',m:'Template 01 loaded'},{t:'a',m:'david@thewebsiteinn.co.uk warming'},{t:'',m:'Queue: 0 pending'}]
+  }
+];
+
+// THREE SETUP
+const canvas=document.getElementById('three-canvas');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth,window.innerHeight);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(55,window.innerWidth/window.innerHeight,0.1,1000);
+camera.position.z=95;
+
+// PARTICLES
+const PC=1600;
+const pPos=new Float32Array(PC*3);
+const pBase=[];
+const pCol=new Float32Array(PC*3);
+const cls=[new THREE.Color('#4AB3FF'),new THREE.Color('#00B4D8'),new THREE.Color('#00FF88'),new THREE.Color('#C0C8D8'),new THREE.Color('#FF3355')];
+for(let i=0;i<PC;i++){
+  const th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI;
+  const r=0.5+Math.random()*50;
+  const x=r*Math.sin(ph)*Math.cos(th),y=r*Math.sin(ph)*Math.sin(th),z=(Math.random()-0.5)*18;
+  pPos[i*3]=x;pPos[i*3+1]=y;pPos[i*3+2]=z;
+  pBase.push({x,y,z,spd:Math.random()*0.5+0.2,phase:Math.random()*Math.PI*2,amp:Math.random()*2+0.5});
+  const c=cls[Math.floor(Math.random()*cls.length)];
+  pCol[i*3]=c.r;pCol[i*3+1]=c.g;pCol[i*3+2]=c.b;
+}
+const pGeo=new THREE.BufferGeometry();
+pGeo.setAttribute('position',new THREE.BufferAttribute(pPos,3));
+pGeo.setAttribute('color',new THREE.BufferAttribute(pCol,3));
+const pMesh=new THREE.Points(pGeo,new THREE.PointsMaterial({size:0.38,vertexColors:true,transparent:true,opacity:0.75}));
+scene.add(pMesh);
+
+// NEURAL LINES
+const lineObjs=[];
+for(let i=0;i<70;i++){
+  const angle=Math.random()*Math.PI*2;
+  const len=15+Math.random()*55;
+  const pts=[new THREE.Vector3(0,0,0),new THREE.Vector3(Math.cos(angle)*len,Math.sin(angle)*len,(Math.random()-0.5)*10)];
+  const geo=new THREE.BufferGeometry().setFromPoints(pts);
+  const c=cls[Math.floor(Math.random()*cls.length)];
+  const mat=new THREE.LineBasicMaterial({color:c,transparent:true,opacity:0.04+Math.random()*0.12});
+  scene.add(new THREE.Line(geo,mat));
+  lineObjs.push({mat,phase:Math.random()*Math.PI*2,spd:Math.random()*0.02+0.005});
+}
+
+// CORE — turquoise brain colour
+const glowM=new THREE.Mesh(new THREE.SphereGeometry(3.5,32,32),new THREE.MeshBasicMaterial({color:0x00B4D8,transparent:true,opacity:0.1}));
+scene.add(glowM);
+const coreM=new THREE.Mesh(new THREE.SphereGeometry(1.2,32,32),new THREE.MeshBasicMaterial({color:0x00B4D8,transparent:true,opacity:0.5}));
+scene.add(coreM);
+
+// CONNECTOR CANVAS
+const connCanvas=document.getElementById('conn-canvas');
+const connCtx=connCanvas.getContext('2d');
+function resizeConn(){connCanvas.width=window.innerWidth;connCanvas.height=window.innerHeight}
+resizeConn();
+
+// DRIFT PATHS
+const agentDrift=[
+  {cx:0,cy:0,ax:3,ay:3,fx:0.3,fy:0.4,px:0,py:0},
+  {cx:18,cy:-20,ax:14,ay:10,fx:0.17,fy:0.23,px:1.1,py:0.7},
+  {cx:-20,cy:15,ax:12,ay:14,fx:0.21,fy:0.15,px:2.3,py:1.8},
+  {cx:-30,cy:-10,ax:16,ay:8,fx:0.13,fy:0.19,px:0.5,py:2.1},
+  {cx:10,cy:28,ax:10,ay:15,fx:0.19,fy:0.12,px:3.1,py:0.3},
+  {cx:30,cy:5,ax:8,ay:16,fx:0.11,fy:0.22,px:1.7,py:2.9},
+  {cx:5,cy:-32,ax:15,ay:9,fx:0.22,fy:0.16,px:0.9,py:1.4},
+  {cx:-12,cy:30,ax:13,ay:12,fx:0.16,fy:0.2,px:2.7,py:0.8},
+];
+
+// BUILD LABELS
+const labelEls={};
+AGENTS.forEach((a,i)=>{
+  const el=document.createElement('div');
+  el.className=`agent-label`;
+  el.style.setProperty('--agent-color', a.gemColor);
+  el.innerHTML=`
+    <div class="agent-box" style="border-color:${a.gemColor}22">
+      <span class="a-gem">${a.gem}</span>
+      <span class="a-name" style="color:${a.gemColor}">${a.id}</span>
+      <span class="a-status"><span class="a-dot" style="background:${a.gemColor}"></span>ONLINE</span>
+    </div>`;
+  el.onclick=()=>openPanel(a);
+  document.body.appendChild(el);
+  labelEls[a.id]=el;
+});
+
+const screenPos={};
+let t=0;
+
+function animate(){
+  requestAnimationFrame(animate);
+  t+=0.006;
+
+  const pos=pGeo.attributes.position.array;
+  for(let i=0;i<PC;i++){
+    const b=pBase[i];
+    pos[i*3]=b.x+Math.sin(t*b.spd+b.phase)*b.amp;
+    pos[i*3+1]=b.y+Math.cos(t*b.spd*0.8+b.phase)*b.amp;
+  }
+  pGeo.attributes.position.needsUpdate=true;
+
+  lineObjs.forEach(l=>{l.mat.opacity=(Math.sin(t*l.spd*6+l.phase)*0.5+0.5)*0.14});
+
+  const pulse=Math.sin(t*1.6)*0.5+0.5;
+  coreM.material.opacity=0.3+pulse*0.35;
+  glowM.scale.setScalar(1+pulse*0.25);
+  scene.rotation.y=Math.sin(t*0.07)*0.12;
+  pMesh.rotation.z=t*0.03;
+
+  const cx=window.innerWidth/2,cy=window.innerHeight/2;
+  const scale=Math.min(window.innerWidth,window.innerHeight)/200;
+
+  AGENTS.forEach((a,i)=>{
+    const d=agentDrift[i];
+    const x3=d.cx+d.ax*Math.sin(t*d.fx+d.px)+d.ax*0.3*Math.sin(t*d.fx*2.3+d.px*1.4);
+    const y3=d.cy+d.ay*Math.cos(t*d.fy+d.py)+d.ay*0.3*Math.cos(t*d.fy*1.7+d.py*0.9);
+    const sx=cx+x3*scale, sy=cy+y3*scale;
+    screenPos[a.id]={x:sx,y:sy};
+    labelEls[a.id].style.left=sx+'px';
+    labelEls[a.id].style.top=sy+'px';
+  });
+
+  // CONNECTOR LINES
+  connCtx.clearRect(0,0,connCanvas.width,connCanvas.height);
+  const gp=screenPos['GALAXY']||{x:cx,y:cy};
+  AGENTS.forEach((a,i)=>{
+    if(a.id==='GALAXY')return;
+    const p=screenPos[a.id];if(!p)return;
+    const alpha=0.12+0.08*Math.sin(t*1.2+i);
+    const grad=connCtx.createLinearGradient(gp.x,gp.y,p.x,p.y);
+    grad.addColorStop(0,`rgba(0,180,216,${alpha})`);
+    grad.addColorStop(1,hexToRgba(a.gemColor,alpha*0.6));
+    connCtx.beginPath();
+    connCtx.moveTo(gp.x,gp.y);
+    const mx=(gp.x+p.x)/2+(p.y-gp.y)*0.15*Math.sin(t*0.5+i);
+    const my=(gp.y+p.y)/2-(p.x-gp.x)*0.15*Math.sin(t*0.4+i);
+    connCtx.quadraticCurveTo(mx,my,p.x,p.y);
+    connCtx.strokeStyle=grad;connCtx.lineWidth=0.7;connCtx.stroke();
+
+    // pulse dot
+    const prog=(Math.sin(t*0.8+i*0.9)*0.5+0.5);
+    const bx=gp.x+(p.x-gp.x)*prog, by=gp.y+(p.y-gp.y)*prog;
+    connCtx.beginPath();connCtx.arc(bx,by,2.5,0,Math.PI*2);
+    connCtx.fillStyle=a.gemColor;connCtx.fill();
+  });
+
+  renderer.render(scene,camera);
+}
+animate();
+
+function hexToRgba(hex,alpha){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+window.addEventListener('resize',()=>{
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  resizeConn();
+});
+
+// AGENT PAGE URLs — relative to galaxy-agents repo
+const AGENT_PAGES={
+  SCOUT:'GALAXY-SCOUT.html',
+  FORGE:'GALAXY-FORGE.html',
+  LAUNCH:'GALAXY-LAUNCH.html',
+  SCANNER:'GALAXY-SCANNER.html',
+  DISPATCH:'GALAXY-DISPATCH.html',
+  SAM:'GALAXY-SAM.html',
+  SENTINEL:'GALAXY-SENTINEL.html',
+  GALAXY:null
+};
+
+function openPanel(agent){
+  document.getElementById('panel-gem-bar').style.background=agent.gemColor;
+  document.getElementById('panel-gem-bar').style.boxShadow=`0 0 16px ${agent.gemColor}`;
+  document.getElementById('panel-gem-icon').textContent=agent.gem;
+  document.getElementById('panel-title').textContent=agent.id;
+  document.getElementById('panel-title').style.color=agent.gemColor;
+  document.getElementById('panel-role').textContent=agent.role;
+  document.getElementById('panel-stats').innerHTML=agent.stats.map(s=>`<div class="pstat"><span class="pval" style="color:${s.color}">${s.val}</span><span class="plbl">${s.lbl}</span></div>`).join('');
+  const time=new Date().toTimeString().slice(0,8);
+  document.getElementById('activity-log').innerHTML=agent.activity.map(a=>`<div class="act-line ${a.t}">[${time}] ${a.m}</div>`).join('');
+
+  // Show open button if page exists
+  const page=AGENT_PAGES[agent.id];
+  const openBtn=document.getElementById('open-agent-btn');
+  if(page){
+    openBtn.style.display='block';
+    openBtn.style.borderColor=agent.gemColor;
+    openBtn.style.color=agent.gemColor;
+    openBtn.onclick=()=>window.location.href=page;
+    openBtn.textContent=`OPEN ${agent.id} →`;
+  } else {
+    openBtn.style.display='none';
+  }
+
+  document.documentElement.style.setProperty('--current-gem-color',agent.gemColor);
+  document.getElementById('agent-panel').classList.add('open');
+}
+function closePanel(){document.getElementById('agent-panel').classList.remove('open')}
+
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8)},1000);
+document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8);
+</script>
+</body>
+</html>
