@@ -879,12 +879,13 @@ async function triggerParallelPipeline(lead){
         if(toEmail){
           try{
             const INSTANTLY_KEY=STATE.instantlyKey||'';
-            const emailRes=await fetch('https://api.instantly.ai/api/v2/emails/send',{
+            const emailRes=await fetch(`https://api.instantly.ai/api/v1/emails/send?api_key=${INSTANTLY_KEY}`,{
               method:'POST',
-              headers:{'Content-Type':'application/json','Authorization':`Bearer ${INSTANTLY_KEY}`},
+              headers:{'Content-Type':'application/json'},
               body:JSON.stringify({
-                from:{name:'The Website Inn',address:'david@thewebsiteinn.co.uk'},
-                to:[{address:toEmail}],
+                from:'david@thewebsiteinn.co.uk',
+                from_name:'The Website Inn',
+                to:toEmail,
                 subject:`${l.name} — We Built This For You`,
                 body:`<p>We built your website. See it live here:</p><p><a href="${url}">${url}</a></p><p>We came across ${l.name} and felt you were being underrepresented online. So we built something. No obligation. No catch. Just click the link.</p><p>If it's the standard you'd expect your business to be represented at — reply to this email.</p><p>— The Website Inn<br>thewebsiteinn.co.uk</p>`
               })
@@ -1734,38 +1735,25 @@ async function startDispatch(){
 
       try{
         const INSTANTLY_KEY=STATE.instantlyKey||'';
-        if(STATE.demoMode){
-          // DEMO — send to demo email via Instantly
-          addLog('DISPATCH',`Sending demo email to: ${toEmail}`,'i');
-          const emailRes=await fetch('https://api.instantly.ai/api/v2/emails/send',{
-            method:'POST',
-            headers:{'Content-Type':'application/json','Authorization':`Bearer ${INSTANTLY_KEY}`},
-            body:JSON.stringify({
-              from:{'name':'The Website Inn','address':'david@thewebsiteinn.co.uk'},
-              to:[{'address':toEmail}],
-              subject:`${item.business_name} — We Built This For You`,
-              body:`<p>We built your website. See it live here:</p><p><a href="${item.live_url}">${item.live_url}</a></p><p>We came across ${item.business_name} and felt you were being underrepresented online. So we built something. No obligation. No catch. Just click the link.</p><p>If it's the standard you'd expect your business to be represented at — reply to this email and we'll get a call booked.</p><p>Yes this is a cold email. Before you close this — Google us, find us on Instagram, look us up on Companies House. We're a legitimate UK agency that builds websites for businesses who deserve better.</p><p>— The Website Inn<br>thewebsiteinn.co.uk</p>`
-            })
-          });
-          const emailData=await emailRes.json();
-          if(emailRes.ok){addLog('DISPATCH',`EMAIL SENT: ${item.business_name} → ${toEmail}`,'s')}
-          else{addLog('DISPATCH',`Instantly error: ${JSON.stringify(emailData)}`,'e')}
+        const emailSubject=`${item.business_name} — We Built This For You`;
+        const emailBody=`<p>We built your website. See it live here:</p><p><a href="${item.live_url}">${item.live_url}</a></p><p>We came across ${item.business_name} and felt you were being underrepresented online. So we built something. No obligation. No catch. Just click the link.</p><p>If it's the standard you'd expect your business to be represented at — reply to this email.</p><p>Yes this is a cold email. Before you close this — Google us, find us on Instagram, look us up on Companies House. We're a legitimate UK agency.</p><p>— The Website Inn<br>thewebsiteinn.co.uk</p>`;
+        addLog('DISPATCH',`Sending to: ${toEmail}`,'i');
+        const emailRes=await fetch(`https://api.instantly.ai/api/v1/emails/send?api_key=${INSTANTLY_KEY}`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            from:'david@thewebsiteinn.co.uk',
+            from_name:'The Website Inn',
+            to:toEmail,
+            subject:emailSubject,
+            body:emailBody
+          })
+        });
+        const emailData=await emailRes.json();
+        if(emailRes.ok||emailData.id||emailData.message_id){
+          addLog('DISPATCH',`✅ SENT: ${item.business_name} → ${toEmail}`,'s');
         } else {
-          // LIVE — send to real business email
-          addLog('DISPATCH',`Sending live email to: ${toEmail}`,'i');
-          const emailRes=await fetch('https://api.instantly.ai/api/v2/emails/send',{
-            method:'POST',
-            headers:{'Content-Type':'application/json','Authorization':`Bearer ${INSTANTLY_KEY}`},
-            body:JSON.stringify({
-              from:{'name':'The Website Inn','address':'david@thewebsiteinn.co.uk'},
-              to:[{'address':toEmail}],
-              subject:`${item.business_name} — We Built This For You`,
-              body:`<p>We built your website. See it live here:</p><p><a href="${item.live_url}">${item.live_url}</a></p><p>We came across ${item.business_name} and felt you were being underrepresented online. So we built something. No obligation. No catch. Just click the link.</p><p>If it's the standard you'd expect your business to be represented at — reply to this email and we'll get a call booked.</p><p>— The Website Inn<br>thewebsiteinn.co.uk</p>`
-            })
-          });
-          const emailData=await emailRes.json();
-          if(emailRes.ok){addLog('DISPATCH',`LIVE EMAIL SENT: ${item.business_name} → ${toEmail}`,'s')}
-          else{addLog('DISPATCH',`Instantly error: ${JSON.stringify(emailData)}`,'e')}
+          addLog('DISPATCH',`❌ Error: ${JSON.stringify(emailData)}`,'e');
         }
         await sbUpdate('dispatch_queue',item.id,{status:'sent',sent_at:new Date().toISOString()});
         STATE.sentLog.push({business_name:item.business_name,to:toEmail,live_url:item.live_url});
