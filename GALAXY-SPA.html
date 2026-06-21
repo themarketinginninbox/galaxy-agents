@@ -840,14 +840,42 @@ async function triggerParallelPipeline(lead){
       STATE.launchRunning=true;
       const repo=`galaxy-${slugify(l.name)}`;
       const url=`https://${GITHUB_USER}.github.io/${repo}/`;
-      try{await githubReq('/user/repos','POST',{name:repo,private:false,auto_init:false})}catch{}
-      await new Promise(r=>setTimeout(r,1500));
+
+      // Step 1: Create repo — log result explicitly
+      const repoRes=await githubReq('/user/repos','POST',{name:repo,private:false,auto_init:false,description:`GALAXY — ${l.name}`});
+      if(repoRes?.id){
+        pipelineLog(`🟢 LAUNCH: Repo created — ${repo}`,'s');
+      } else if(repoRes?.errors?.[0]?.message?.includes('already exists')||repoRes?.message?.includes('already exists')){
+        pipelineLog(`🟢 LAUNCH: Repo exists — reusing ${repo}`,'i');
+      } else {
+        pipelineLog(`🟢 LAUNCH: Repo error — ${JSON.stringify(repoRes?.message||repoRes?.errors)}`,'e');
+      }
+      await new Promise(r=>setTimeout(r,2000));
+
+      // Step 2: Push index.html
       const encoded=btoa(unescape(encodeURIComponent(html)));
       let sha=null;
       try{const ex=await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`);sha=ex?.sha}catch{}
       const pb={message:'GALAXY LAUNCH',content:encoded};if(sha)pb.sha=sha;
-      await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`,'PUT',pb);
-      try{await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch:'main',path:'/'}})}catch{}
+      const pushRes=await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`,'PUT',pb);
+      if(pushRes?.content?.name){
+        pipelineLog(`🟢 LAUNCH: index.html pushed`,'s');
+      } else {
+        pipelineLog(`🟢 LAUNCH: Push error — ${JSON.stringify(pushRes?.message)}`,'e');
+      }
+
+      // Step 3: Enable Pages
+      await new Promise(r=>setTimeout(r,1500));
+      const pagesRes=await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch:'main',path:'/'}});
+      if(pagesRes?.url||pagesRes?.html_url){
+        pipelineLog(`🟢 LAUNCH: Pages enabled`,'s');
+      } else if(pagesRes?.message?.includes('already enabled')){
+        pipelineLog(`🟢 LAUNCH: Pages already enabled`,'i');
+      } else {
+        // Try PUT to update existing pages config
+        try{await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'PUT',{source:{branch:'main',path:'/'}})}catch{}
+      }
+
       const launchRow=await sbInsert('launch_output',{forge_id:forgeRow?.id,business_name:l.name,github_repo:repo,live_url:url,status:'live'});
       if(forgeRow?.id)await sbUpdate('forge_output',forgeRow.id,{status:'deployed'});
       STATE.launchQueue.push({...l,status:'live',url});
@@ -878,8 +906,8 @@ async function triggerParallelPipeline(lead){
         const toEmail=STATE.demoMode?STATE.demoEmail:l.email;
         if(toEmail){
           try{
-            // Get or create campaign
             const campData=await workerFetch('get_campaign');
+            pipelineLog(`🟠 DISPATCH: Campaign — ${JSON.stringify(campData)}`,'i');
             if(campData.ok){
               const addData=await workerFetch('add_lead',{
                 campaign_id:campData.campaign_id,
@@ -887,18 +915,21 @@ async function triggerParallelPipeline(lead){
                 business_name:l.name,
                 live_url:url
               });
+              pipelineLog(`🟠 DISPATCH: Lead result — ${JSON.stringify(addData)}`,'i');
               if(addData.ok){
                 STATE.sentLog.push({business_name:l.name,to:toEmail,live_url:url});
                 STATE.stats.sent++;updateBottomBar();
                 pipelineLog(`🟠 DISPATCH: Queued → ${toEmail}`,'s');
-                await sbUpdate('dispatch_queue',launchRow?.id,{status:'sent',sent_at:new Date().toISOString()});
+                if(launchRow?.id)await sbUpdate('dispatch_queue',launchRow.id,{status:'sent',sent_at:new Date().toISOString()});
               } else {
-                pipelineLog(`🟠 DISPATCH: Error — ${JSON.stringify(addData.error)}`,'e');
+                pipelineLog(`🟠 DISPATCH: Lead error — ${JSON.stringify(addData)}`,'e');
               }
             } else {
-              pipelineLog(`🟠 DISPATCH: Campaign error — ${JSON.stringify(campData.error)}`,'e');
+              pipelineLog(`🟠 DISPATCH: Campaign error — ${JSON.stringify(campData)}`,'e');
             }
           }catch(e){pipelineLog(`🟠 DISPATCH error: ${e.message}`,'e')}
+        } else {
+          pipelineLog(`🟠 DISPATCH: No email for ${l.name} — skipped`,'w');
         }
         const delay=(STATE.sendDelay||30)*1000;
         await new Promise(r=>setTimeout(r,delay));
