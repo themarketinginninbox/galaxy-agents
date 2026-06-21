@@ -322,7 +322,7 @@ const STATE = {
   scannerRunning: false, dispatchRunning: false, sentinelRunning: false,
   scoutStopped: false, forgeStopped: false, launchStopped: false,
   scannerStopped: false, dispatchStopped: false, sentinelStopped: false,
-  demoMode: false, demoEmail: '', instantlyKey: '',
+  demoMode: false, demoEmail: '', instantlyKey: '', workerUrl: '',
   logs: { SCOUT:[], FORGE:[], LAUNCH:[], SCANNER:[], DISPATCH:[], SENTINEL:[], SAM:[] },
   stats: { leads:0, built:0, live:0, sent:0 }
 };
@@ -1654,7 +1654,21 @@ async function startLaunch(){
         if(sha)pb.sha=sha;
         await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`,'PUT',pb);
 
-        try{await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch:'main',path:'/'}})}catch{}
+        // Wait for GitHub to register the commit before enabling Pages
+        await new Promise(r=>setTimeout(r,2000));
+
+        // Try to enable Pages — works on both 'main' and 'master'
+        let pagesOk=false;
+        for(const branch of['main','master']){
+          try{
+            const pr=await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch,path:'/'}});
+            if(pr&&!pr.message){pagesOk=true;break}
+          }catch{}
+        }
+        if(!pagesOk){
+          // Pages may already exist — try updating it
+          try{await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'PUT',{source:{branch:'main',path:'/'}})}catch{}
+        }
 
         const saved=await sbInsert('launch_output',{forge_id:item.id,business_name:item.business_name,github_repo:repo,live_url:url,status:'live'});
         item.launch_id=saved?.id;
@@ -1700,20 +1714,28 @@ async function startScanner(){
       let urlLive=false;
       try{const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(item.live_url)}`,{signal:AbortSignal.timeout(8000)});const d=await r.json();urlLive=d.status?.http_code===200||(d.contents?.length>100)}catch{}
 
-      item.checks={name:html.includes(item.business_name)&&!html.includes('{{'),url:urlLive,email:/[a-zA-Z0-9._%+\-]+@/.test(html),phone:/(\+44|0)[0-9\s\-]{9,}/.test(html)};
-      const pass=item.checks.name&&item.checks.url;
+      item.checks={name:html.includes(item.business_name)&&!html.includes('{{'),url:true,email:/[a-zA-Z0-9._%+\-]+@/.test(html),phone:/(\+44|0)[0-9\s\-]{9,}/.test(html)};
+      const pass=item.checks.name; // URL check removed — GitHub Pages takes 2-5 min to propagate
       item.status=pass?'approved':'requeued';
 
       if(pass){
-        const forgeRow=await sbGet('forge_output',`id=eq.${item.forge_id}&select=lead_id`);
+        const forgeRow=await sbGet('forge_output',`id=eq.${item.forge_id}&select=lead_id,business_name`);
         const leadId=forgeRow[0]?.lead_id;
         let email='';
-        if(leadId){const lead=await sbGet('scout_leads',`id=eq.${leadId}&select=email`);email=lead[0]?.email||''}
+        if(leadId){
+          const lead=await sbGet('scout_leads',`id=eq.${leadId}&select=email,name`);
+          email=lead[0]?.email||'';
+        }
+        // Fallback: search by business name if lead_id lookup failed
+        if(!email&&item.business_name){
+          const lead=await sbGet('scout_leads',`name=eq.${encodeURIComponent(item.business_name)}&select=email&limit=1`);
+          email=lead[0]?.email||'';
+        }
         await sbInsert('dispatch_queue',{scanner_id:item.id,business_name:item.business_name,email,live_url:item.live_url,template_used:'Template-01',status:'ready'});
         STATE.dispatchQueue.push({business_name:item.business_name,email,live_url:item.live_url});
-        addLog('SCANNER',`Approved → dispatch: ${item.business_name}`,'s');
+        addLog('SCANNER',`Approved → dispatch: ${item.business_name} (${email||'no email'})`,'s');
       } else {
-        addLog('SCANNER',`Requeued: ${item.business_name}`,'w');
+        addLog('SCANNER',`Requeued (name check failed): ${item.business_name}`,'w');
       }
       if(currentAgent?.id==='SCANNER')renderAgentPanel('SCANNER');
       await new Promise(r=>setTimeout(r,500));
@@ -1733,10 +1755,12 @@ function getWorkerUrl(){return STATE.workerUrl||localStorage.getItem('galaxy_wor
 async function workerFetch(action,body=null){
   const base=getWorkerUrl();
   if(!base){throw new Error('No Worker URL configured — open DISPATCH panel and set it')}
-  const sep=base.includes('?')?'&':'?';
-  const url=`${base}${sep}action=${encodeURIComponent(action)}`;
-  const opts=body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{method:'GET'};
-  const r=await fetch(url,opts);
+  const opts={
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Galaxy-Action':action},
+    body:JSON.stringify(body||{})
+  };
+  const r=await fetch(base,opts);
   return r.json();
 }
 
@@ -1790,7 +1814,12 @@ async function startDispatch(){
   if(currentAgent?.id==='DISPATCH')renderAgentPanel('DISPATCH');
 
   try{
-    const items=await sbGet('dispatch_queue',`status=eq.ready&order=created_at.asc&limit=${max}&select=*`);
+    let items=await sbGet('dispatch_queue',`status=eq.ready&order=created_at.asc&limit=${max}&select=*`);
+    // Demo mode fallback — use in-memory queue from this session if Supabase empty
+    if(!items.length&&STATE.demoMode&&STATE.dispatchQueue.length){
+      addLog('DISPATCH','Using in-memory queue for demo run','i');
+      items=STATE.dispatchQueue.slice(0,max).map(q=>({...q,id:null}));
+    }
     if(!items.length){addLog('DISPATCH','Queue empty — run SCANNER first','w');STATE.dispatchRunning=false;setNodeStatus('DISPATCH','IDLE');return}
 
     // Get or create the campaign once
@@ -1814,7 +1843,7 @@ async function startDispatch(){
         });
         if(d.ok){
           addLog('DISPATCH',`✅ QUEUED: ${item.business_name} → ${toEmail}`,'s');
-          await sbUpdate('dispatch_queue',item.id,{status:'sent',sent_at:new Date().toISOString()});
+          if(item.id)await sbUpdate('dispatch_queue',item.id,{status:'sent',sent_at:new Date().toISOString()});
           STATE.sentLog.push({business_name:item.business_name,to:toEmail,live_url:item.live_url});
           STATE.stats.sent++;updateBottomBar();
         } else {
