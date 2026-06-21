@@ -1074,6 +1074,8 @@ function loadSavedKeys(){
   if(k){STATE.instantlyKey=k}
   const g=localStorage.getItem('galaxy_github_token');
   if(g){STATE.githubToken=g}
+  const w=localStorage.getItem('galaxy_worker_url');
+  if(w){STATE.workerUrl=w}
 }
 function saveInstantlyKey(){
   const val=document.getElementById('instantly-key-input')?.value?.trim();
@@ -1378,6 +1380,7 @@ function renderScannerPanel(){
 
 // DISPATCH PANEL
 function renderDispatchPanel(){
+  const workerUrl=getWorkerUrl();
   return `
   <div class="p-stats">
     <div class="p-stat"><span class="v" style="color:var(--dispatch)">${STATE.dispatchQueue.length}</span><span class="l">IN QUEUE</span></div>
@@ -1385,16 +1388,27 @@ function renderDispatchPanel(){
     <div class="p-stat"><span class="v" style="color:var(--red)">0</span><span class="l">BOUNCED</span></div>
     <div class="p-stat"><span class="v" style="color:var(--dispatch)">david@</span><span class="l">INBOX</span></div>
   </div>
-  ${STATE.dispatchRunning?`<div class="running-badge active"><div class="rb-dot"></div>DISPATCH SENDING EMAILS</div>`:''}
-  ${!STATE.instantlyKey?`<div style="background:rgba(255,51,85,0.06);border:1px solid rgba(255,51,85,0.2);border-radius:6px;padding:12px;margin-bottom:12px">
-    <div style="font-size:8px;letter-spacing:2px;color:#FF3355;margin-bottom:6px">⚠️ INSTANTLY API KEY REQUIRED</div>
-    <input class="p-input" id="instantly-key-input" type="password" placeholder="Paste your Instantly API key...">
-    <div style="font-size:8px;color:rgba(192,200,216,0.4);letter-spacing:1px;margin:6px 0 8px">Saved to this device only — never uploaded anywhere</div>
-    <button class="p-btn" style="margin:0" onclick="saveInstantlyKey()">💾 SAVE KEY TO DEVICE</button>
-  </div>`:`<div style="background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.15);border-radius:6px;padding:8px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
-    <span style="font-size:9px;color:var(--green);letter-spacing:1px">✓ API KEY SAVED ON DEVICE</span>
-    <button onclick="clearInstantlyKey()" style="background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:3px;color:#FF3355;font-size:8px;padding:3px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace">CLEAR</button>
-  </div>`}
+  ${STATE.dispatchRunning?`<div class="running-badge active"><div class="rb-dot"></div>DISPATCH RUNNING</div>`:''}
+
+  <!-- WORKER URL CONFIG -->
+  ${!workerUrl?`
+  <div style="background:rgba(255,51,85,0.06);border:1px solid rgba(255,51,85,0.2);border-radius:6px;padding:12px;margin-bottom:12px">
+    <div style="font-size:8px;letter-spacing:2px;color:#FF3355;margin-bottom:6px">⚠️ CLOUDFLARE WORKER URL REQUIRED</div>
+    <div style="font-size:8px;color:rgba(192,200,216,0.4);margin-bottom:8px">Deploy galaxy-worker.js to Cloudflare Workers first, then paste your URL below</div>
+    <input class="p-input" id="worker-url-input" type="url" placeholder="https://galaxy-proxy.YOUR-NAME.workers.dev">
+    <button class="p-btn" style="margin-top:8px" onclick="saveWorkerUrl()">💾 SAVE WORKER URL</button>
+  </div>`:`
+  <div style="background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.15);border-radius:6px;padding:8px 12px;margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-size:9px;color:var(--green);letter-spacing:1px">✓ WORKER CONFIGURED</span>
+      <button onclick="clearWorkerUrl()" style="background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:3px;color:#FF3355;font-size:8px;padding:3px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace">CLEAR</button>
+    </div>
+    <div style="font-size:8px;color:rgba(192,200,216,0.3);word-break:break-all">${workerUrl}</div>
+  </div>
+  <button onclick="testWorkerConnection()" style="width:100%;padding:9px;background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;cursor:pointer;margin-bottom:12px">🔑 TEST CONNECTION</button>
+  `}
+
+  <!-- DEMO MODE -->
   <div class="demo-box">
     <span class="demo-head">🎯 DEMO MODE</span>
     <div class="toggle-row">
@@ -1403,6 +1417,7 @@ function renderDispatchPanel(){
     </div>
     ${STATE.demoMode?`<input class="p-input" id="demo-email-input" type="email" placeholder="your@email.com" value="${STATE.demoEmail}" oninput="STATE.demoEmail=this.value">`:''}
   </div>
+
   <div class="p-section">
     <span class="p-label">Max Sends</span>
     <select class="p-select" id="dispatch-max"><option value="1">1</option><option value="5" selected>5</option><option value="10">10</option><option value="25">25</option><option value="999">All</option></select>
@@ -1413,7 +1428,7 @@ function renderDispatchPanel(){
   </div>
   ${STATE.dispatchRunning
     ?`<button class="p-btn stop" style="margin-top:12px" onclick="STATE.dispatchStopped=true">⬛ STOP DISPATCH</button>`
-    :`<div class="pipeline-note" style="margin-top:12px">DISPATCH activates automatically when SCANNER approves a site. Emails fire with the configured delay.</div>`
+    :`<div class="pipeline-note" style="margin-top:12px">DISPATCH fires automatically after SCANNER approves. Leads get added to the Instantly campaign and sent within UK business hours.</div>`
   }
   <div class="p-progress" id="prog-DISPATCH"><div class="p-progress-label" id="progl-DISPATCH"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-DISPATCH"></div></div></div>
   <div class="p-log" id="log-DISPATCH"></div>
@@ -1422,7 +1437,7 @@ function renderDispatchPanel(){
     <div style="overflow-x:auto;max-height:150px;overflow-y:auto">
       <table class="p-table">
         <thead><tr><th>Business</th><th>Email</th><th>Status</th></tr></thead>
-        <tbody>${STATE.sentLog.length?STATE.sentLog.slice(0,15).map(i=>`<tr><td style="color:#fff">${i.business_name||'—'}</td><td style="font-size:8px">${i.to||'—'}</td><td><span class="badge ok">SENT</span></td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO SENDS YET</div></td></tr>'}</tbody>
+        <tbody>${STATE.sentLog.length?STATE.sentLog.slice(0,15).map(i=>`<tr><td style="color:#fff">${i.business_name||'—'}</td><td style="font-size:8px">${i.to||'—'}</td><td><span class="badge ok">QUEUED</span></td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO SENDS YET</div></td></tr>'}</tbody>
       </table>
     </div>
   </div>`;
@@ -1711,10 +1726,61 @@ async function startScanner(){
 }
 
 // ═══════════════════════════════════════════
+// CLOUDFLARE WORKER PROXY HELPERS
+// ═══════════════════════════════════════════
+function getWorkerUrl(){return STATE.workerUrl||localStorage.getItem('galaxy_worker_url')||''}
+
+async function workerFetch(action,body=null){
+  const base=getWorkerUrl();
+  if(!base){throw new Error('No Worker URL configured — open DISPATCH panel and set it')}
+  const opts={method:body?'POST':'GET',headers:{'Content-Type':'application/json','X-Galaxy-Action':action}};
+  if(body)opts.body=JSON.stringify(body);
+  const r=await fetch(base,opts);
+  return r.json();
+}
+
+async function testWorkerConnection(){
+  addLog('DISPATCH','Testing Worker connection...','i');
+  try{
+    const d=await workerFetch('test_key');
+    if(d.ok){addLog('DISPATCH','✅ WORKER CONNECTED — Instantly key valid','s')}
+    else{addLog('DISPATCH',`❌ Worker error: ${JSON.stringify(d.error)}`,'e')}
+  }catch(e){addLog('DISPATCH',`❌ Worker unreachable: ${e.message}`,'e')}
+  if(currentAgent?.id==='DISPATCH')renderAgentPanel('DISPATCH');
+}
+
+async function getOrCreateCampaign(){
+  addLog('DISPATCH','Fetching/creating Instantly campaign...','i');
+  const d=await workerFetch('get_campaign');
+  if(d.ok){
+    addLog('DISPATCH',`Campaign ${d.created?'created':'found'}: ${d.campaign_id}`,'s');
+    return d.campaign_id;
+  }
+  addLog('DISPATCH',`Campaign error: ${JSON.stringify(d.error)}`,'e');
+  return null;
+}
+
+function saveWorkerUrl(){
+  const val=document.getElementById('worker-url-input')?.value?.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_worker_url',val);
+  STATE.workerUrl=val;
+  addLog('DISPATCH','Worker URL saved','s');
+  renderAgentPanel('DISPATCH');
+}
+function clearWorkerUrl(){
+  localStorage.removeItem('galaxy_worker_url');
+  STATE.workerUrl='';
+  renderAgentPanel('DISPATCH');
+}
+
+// ═══════════════════════════════════════════
 // DISPATCH LOGIC
 // ═══════════════════════════════════════════
 async function startDispatch(){
   if(STATE.demoMode&&!STATE.demoEmail){addLog('DISPATCH','Enter demo email first','w');return}
+  const workerUrl=getWorkerUrl();
+  if(!workerUrl){addLog('DISPATCH','No Worker URL — set it in the DISPATCH panel','e');return}
   const max=parseInt(document.getElementById('dispatch-max')?.value||5);
   const delay=(STATE.sendDelay||30)*1000;
   STATE.dispatchRunning=true;STATE.dispatchStopped=false;
@@ -1726,39 +1792,33 @@ async function startDispatch(){
     const items=await sbGet('dispatch_queue',`status=eq.ready&order=created_at.asc&limit=${max}&select=*`);
     if(!items.length){addLog('DISPATCH','Queue empty — run SCANNER first','w');STATE.dispatchRunning=false;setNodeStatus('DISPATCH','IDLE');return}
 
+    // Get or create the campaign once
+    const campaignId=await getOrCreateCampaign();
+    if(!campaignId){STATE.dispatchRunning=false;setNodeStatus('DISPATCH','IDLE');return}
+
     for(let i=0;i<items.length;i++){
       if(STATE.dispatchStopped)break;
       const item=items[i];
       const toEmail=STATE.demoMode?STATE.demoEmail:item.email;
+      if(!toEmail){addLog('DISPATCH',`No email for ${item.business_name} — skipping`,'w');continue}
       pBar('DISPATCH',Math.round((i+1)/items.length*100),`Sending ${i+1}/${items.length}`);
-      addLog('DISPATCH',`Sending to: ${toEmail}`,'i');
+      addLog('DISPATCH',`Adding to campaign: ${item.business_name} → ${toEmail}`,'i');
 
       try{
-        const INSTANTLY_KEY=STATE.instantlyKey||'';
-        const emailSubject=`${item.business_name} — We Built This For You`;
-        const emailBody=`<p>We built your website. See it live here:</p><p><a href="${item.live_url}">${item.live_url}</a></p><p>We came across ${item.business_name} and felt you were being underrepresented online. So we built something. No obligation. No catch. Just click the link.</p><p>If it's the standard you'd expect your business to be represented at — reply to this email.</p><p>Yes this is a cold email. Before you close this — Google us, find us on Instagram, look us up on Companies House. We're a legitimate UK agency.</p><p>— The Website Inn<br>thewebsiteinn.co.uk</p>`;
-        addLog('DISPATCH',`Sending to: ${toEmail}`,'i');
-        const emailRes=await fetch(`https://api.instantly.ai/api/v1/emails/send?api_key=${INSTANTLY_KEY}`,{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({
-            from:'david@thewebsiteinn.co.uk',
-            from_name:'The Website Inn',
-            to:toEmail,
-            subject:emailSubject,
-            body:emailBody
-          })
+        const d=await workerFetch('add_lead',{
+          campaign_id:campaignId,
+          email:toEmail,
+          business_name:item.business_name,
+          live_url:item.live_url||''
         });
-        const emailData=await emailRes.json();
-        if(emailRes.ok||emailData.id||emailData.message_id){
-          addLog('DISPATCH',`✅ SENT: ${item.business_name} → ${toEmail}`,'s');
+        if(d.ok){
+          addLog('DISPATCH',`✅ QUEUED: ${item.business_name} → ${toEmail}`,'s');
+          await sbUpdate('dispatch_queue',item.id,{status:'sent',sent_at:new Date().toISOString()});
+          STATE.sentLog.push({business_name:item.business_name,to:toEmail,live_url:item.live_url});
+          STATE.stats.sent++;updateBottomBar();
         } else {
-          addLog('DISPATCH',`❌ Error: ${JSON.stringify(emailData)}`,'e');
+          addLog('DISPATCH',`❌ ${item.business_name}: ${JSON.stringify(d.error)}`,'e');
         }
-        await sbUpdate('dispatch_queue',item.id,{status:'sent',sent_at:new Date().toISOString()});
-        STATE.sentLog.push({business_name:item.business_name,to:toEmail,live_url:item.live_url});
-        STATE.stats.sent++;
-        updateBottomBar();
       }catch(e){addLog('DISPATCH',`Failed: ${e.message}`,'e')}
 
       if(currentAgent?.id==='DISPATCH')renderAgentPanel('DISPATCH');
@@ -1767,7 +1827,7 @@ async function startDispatch(){
         await new Promise(r=>setTimeout(r,delay));
       }
     }
-    addLog('DISPATCH',`Done. ${STATE.sentLog.length} sent total`,'s');
+    addLog('DISPATCH',`Done. ${STATE.sentLog.length} leads queued in Instantly`,'s');
   }catch(e){addLog('DISPATCH',`Error: ${e.message}`,'e')}
 
   STATE.dispatchRunning=false;setNodeStatus('DISPATCH','DONE');
