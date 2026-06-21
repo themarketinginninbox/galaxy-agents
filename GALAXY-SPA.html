@@ -355,15 +355,17 @@ document.addEventListener('mouseup',e=>{
   onDragEnd(e.clientX,e.clientY,e.target);
 });
 
-// Override node click to work with drag system
+// Nodes always open on click/tap
 AGENTS.forEach(a=>{
-  nodeEls[a.id].onclick=null; // remove direct onclick — handled in onDragEnd
+  nodeEls[a.id].onclick=(e)=>{e.stopPropagation();openPanel(a)};
+  nodeEls[a.id].addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
+  nodeEls[a.id].addEventListener('mousedown',e=>e.stopPropagation());
 });
 
 // DRAG HINT
 const dragHint=document.createElement('div');
 dragHint.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);font-size:8px;letter-spacing:2px;color:rgba(192,200,216,0.25);pointer-events:none;z-index:40;transition:opacity 1s';
-dragHint.textContent='← DRAG TO SPIN ORBIT →';
+dragHint.textContent='DRAG TO SPIN';
 document.body.appendChild(dragHint);
 setTimeout(()=>dragHint.style.opacity='0',4000);
 
