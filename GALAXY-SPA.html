@@ -241,16 +241,9 @@ const AGENTS = [
   {id:'SAM',gem:'💜',gemColor:'#9B59B6',role:'Mid — CRM & Operations'},
 ];
 
-const DRIFT=[
-  {cx:0,cy:0,ax:3,ay:3,fx:0.3,fy:0.4,px:0,py:0},
-  {cx:-28,cy:-12,ax:14,ay:8,fx:0.17,fy:0.23,px:1.1,py:0.7},
-  {cx:20,cy:-22,ax:10,ay:12,fx:0.19,fy:0.15,px:2.3,py:1.8},
-  {cx:30,cy:8,ax:8,ay:14,fx:0.13,fy:0.19,px:0.5,py:2.1},
-  {cx:10,cy:28,ax:12,ay:8,fx:0.21,fy:0.12,px:3.1,py:0.3},
-  {cx:-20,cy:22,ax:10,ay:12,fx:0.11,fy:0.22,px:1.7,py:2.9},
-  {cx:-8,cy:-30,ax:14,ay:8,fx:0.22,fy:0.16,px:0.9,py:1.4},
-  {cx:16,cy:18,ax:12,ay:10,fx:0.16,fy:0.2,px:2.7,py:0.8},
-];
+// Agents orbit in a ring — evenly spaced, continuously rotating
+const ORBIT_RADIUS = 38; // distance from centre
+const ORBIT_SPEED = 0.004; // how fast it auto-rotates
 
 // ═══════════════════════════════════════════
 // THREE.JS BACKGROUND
@@ -304,8 +297,8 @@ function onDragStart(x,y){
 function onDragMove(x){
   if(!dragActive)return;
   const dx=x-lastDragX;
-  orbitAngle+=dx*0.008;
-  orbitVelocity=dx*0.008;
+  orbitAngle+=dx*0.003;
+  orbitVelocity=dx*0.003;
   lastDragX=x;
 }
 function onDragEnd(x,y,targetEl){
@@ -383,18 +376,24 @@ function animate(){
   core.material.opacity=0.3+pulse*0.3;glow.scale.setScalar(1+pulse*0.2);
   scene.rotation.y=Math.sin(t*0.07)*0.1;pMesh.rotation.z=t*0.025;
 
-  // Apply momentum decay when not dragging
-  if(!dragActive){orbitVelocity*=0.92;orbitAngle+=orbitVelocity}
+  // Continuous auto-rotation + drag momentum
+  if(!dragActive){orbitVelocity*=0.88;orbitAngle+=ORBIT_SPEED+orbitVelocity}
 
   const cx=innerWidth/2,cy=innerHeight/2,scale=Math.min(innerWidth,innerHeight)/200;
   AGENTS.forEach((a,i)=>{
-    const d=DRIFT[i];
-    // Apply orbit rotation offset to x position
-    const spinX=d.cx*Math.cos(orbitAngle)-d.cy*0.15*Math.sin(orbitAngle);
-    const spinY=d.cy+d.cx*0.15*Math.sin(orbitAngle);
-    const x3=spinX+d.ax*Math.sin(t*d.fx+d.px);
-    const y3=spinY+d.ay*Math.cos(t*d.fy+d.py);
-    const sx=cx+x3*scale,sy=cy+y3*scale;
+    if(i===0){
+      // GALAXY stays at centre with gentle pulse
+      screenPos[a.id]={x:cx,y:cy};
+      nodeEls[a.id].style.left=cx+'px';nodeEls[a.id].style.top=cy+'px';
+      return;
+    }
+    // Evenly space 7 agents around a ring, continuously rotating
+    const totalWorkers=AGENTS.length-1;
+    const baseAngle=(2*Math.PI/totalWorkers)*(i-1);
+    const angle=baseAngle+orbitAngle;
+    const r=ORBIT_RADIUS*scale;
+    const sx=cx+Math.cos(angle)*r;
+    const sy=cy+Math.sin(angle)*r*0.7; // slightly flattened ellipse
     screenPos[a.id]={x:sx,y:sy};
     nodeEls[a.id].style.left=sx+'px';nodeEls[a.id].style.top=sy+'px';
   });
