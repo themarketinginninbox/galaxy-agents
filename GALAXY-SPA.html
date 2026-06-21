@@ -50,13 +50,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 
 /* MACHINE SWITCH */
 #machine-switch-wrap{
-  position:fixed;right:0;top:50%;transform:translateY(-50%);
+  position:fixed;right:12px;top:50%;transform:translateY(-50%);
   z-index:100;display:flex;flex-direction:column;align-items:center;gap:8px;
   padding:16px 10px;
   background:rgba(6,10,24,0.95);
-  border:1px solid rgba(74,179,255,0.12);
-  border-right:none;
-  border-radius:12px 0 0 12px;
+  border:1px solid rgba(0,255,136,0.2);
+  border-radius:12px;
   backdrop-filter:blur(12px);
 }
 .switch-label{
@@ -323,14 +322,14 @@ const STATE = {
   scannerRunning: false, dispatchRunning: false, sentinelRunning: false,
   scoutStopped: false, forgeStopped: false, launchStopped: false,
   scannerStopped: false, dispatchStopped: false, sentinelStopped: false,
-  demoMode: false, demoEmail: '',
+  demoMode: false, demoEmail: '', instantlyKey: '',
   logs: { SCOUT:[], FORGE:[], LAUNCH:[], SCANNER:[], DISPATCH:[], SENTINEL:[], SAM:[] },
   stats: { leads:0, built:0, live:0, sent:0 }
 };
 
 const SUPABASE_URL='https://uklrgpommxqmdvetfxmc.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrbHJncG9tbXhxbWR2ZXRmeG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjQ2MTEsImV4cCI6MjA5NzQwMDYxMX0.xuKX88Hn4Wa_xLuLBrp7SsIsdlbiKbksRwYKwVKr5zI';
-const GITHUB_TOKEN='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';
+const GITHUB_TOKEN=STATE.githubToken||'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';
 const GITHUB_USER='themarketinginninbox';
 
 // ═══════════════════════════════════════════
@@ -348,7 +347,7 @@ const AGENTS = [
 ];
 
 // Agents orbit in a ring — evenly spaced, continuously rotating
-const ORBIT_RADIUS = 38; // distance from centre
+const ORBIT_RADIUS = 52; // distance from centre
 const ORBIT_SPEED = 0.004; // how fast it auto-rotates
 
 // ═══════════════════════════════════════════
@@ -499,7 +498,7 @@ function animate(){
     const angle=baseAngle+orbitAngle;
     const r=ORBIT_RADIUS*scale;
     const sx=cx+Math.cos(angle)*r;
-    const sy=cy+Math.sin(angle)*r*0.7; // slightly flattened ellipse
+    const sy=cy+Math.sin(angle)*r*0.85; // slightly flattened ellipse
     screenPos[a.id]={x:sx,y:sy};
     nodeEls[a.id].style.left=sx+'px';nodeEls[a.id].style.top=sy+'px';
   });
@@ -954,6 +953,31 @@ function resetSwitch(){
 }
 
 // ═══════════════════════════════════════════
+// API KEY MANAGEMENT — localStorage
+// ═══════════════════════════════════════════
+function loadSavedKeys(){
+  const k=localStorage.getItem('galaxy_instantly_key');
+  if(k){STATE.instantlyKey=k}
+  const g=localStorage.getItem('galaxy_github_token');
+  if(g){STATE.githubToken=g}
+}
+function saveInstantlyKey(){
+  const val=document.getElementById('instantly-key-input')?.value?.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_instantly_key',val);
+  STATE.instantlyKey=val;
+  renderAgentPanel('DISPATCH');
+}
+function clearInstantlyKey(){
+  localStorage.removeItem('galaxy_instantly_key');
+  STATE.instantlyKey='';
+  renderAgentPanel('DISPATCH');
+}
+
+// Load saved keys on startup
+loadSavedKeys();
+
+// ═══════════════════════════════════════════
 // SUPABASE HELPERS
 // ═══════════════════════════════════════════
 async function sbGet(table,params=''){const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`,{headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}});return r.json()}
@@ -964,6 +988,40 @@ async function sbUpdate(table,id,data){await fetch(`${SUPABASE_URL}/rest/v1/${ta
 // PANEL SYSTEM
 // ═══════════════════════════════════════════
 let currentAgent=null;
+
+// Auto-refresh panel every second when agent is running
+setInterval(()=>{
+  if(!currentAgent)return;
+  const panelOpen=document.getElementById('agent-panel').classList.contains('open');
+  if(!panelOpen)return;
+  const id=currentAgent.id;
+  const running=STATE[id.toLowerCase()+'Running'];
+  if(running){
+    // Just refresh log and stats — not full re-render to avoid flicker
+    refreshLog(id);
+    // Refresh stats numbers only
+    const statsEl=document.querySelector('#panel-content .p-stats');
+    if(statsEl){
+      const newPanel=document.createElement('div');
+      newPanel.innerHTML=renderAgentStatsOnly(id);
+      const newStats=newPanel.querySelector('.p-stats');
+      if(newStats)statsEl.innerHTML=newStats.innerHTML;
+    }
+  }
+},1000);
+
+function renderAgentStatsOnly(id){
+  switch(id){
+    case 'SCOUT': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--gold)">${STATE.leads.length}</span><span class="l">FOUND</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.leads.filter(l=>l.email).length}</span><span class="l">EMAILS</span></div><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.leads.filter(l=>l.lead_temp==='HOT').length}</span><span class="l">HOT</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.binned.length}</span><span class="l">BIN</span></div></div>`;
+    case 'FORGE': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.forgeQueue.filter(i=>i.status==='queued').length}</span><span class="l">QUEUED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">${STATE.forgeQueue.filter(i=>i.status==='building').length}</span><span class="l">BUILDING</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.forgeQueue.filter(i=>i.status==='saved').length}</span><span class="l">BUILT</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.forgeQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div></div>`;
+    case 'LAUNCH': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.launchQueue.filter(i=>i.status==='queued').length}</span><span class="l">QUEUED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">${STATE.launchQueue.filter(i=>i.status==='deploying').length}</span><span class="l">DEPLOYING</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.launchQueue.filter(i=>i.status==='live').length}</span><span class="l">LIVE</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.launchQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div></div>`;
+    case 'SCANNER': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--scanner)">${STATE.scannerQueue.length}</span><span class="l">TOTAL</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.scannerQueue.filter(i=>i.status==='approved').length}</span><span class="l">APPROVED</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.scannerQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.scannerQueue.filter(i=>i.status==='requeued').length}</span><span class="l">REQUEUED</span></div></div>`;
+    case 'DISPATCH': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--dispatch)">${STATE.dispatchQueue.length}</span><span class="l">IN QUEUE</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">SENT</span></div><div class="p-stat"><span class="v" style="color:var(--red)">0</span><span class="l">BOUNCED</span></div><div class="p-stat"><span class="v" style="color:var(--dispatch)">david@</span><span class="l">INBOX</span></div></div>`;
+    case 'SENTINEL': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--sentinel)">${STATE.binned.length}</span><span class="l">IN BIN</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentinelFound||0}</span><span class="l">RECOVERED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">1</span><span class="l">DOMAINS</span></div><div class="p-stat"><span class="v" style="color:var(--green)">9.8</span><span class="l">HEALTH</span></div></div>`;
+    default: return '';
+  }
+}
+
 function openPanel(agent){
   currentAgent=agent;
   const panel=document.getElementById('agent-panel');
@@ -1090,6 +1148,7 @@ function renderGalaxyPanel(){
 // SCOUT PANEL
 function renderScoutPanel(){
   const leads=STATE.leads;
+  const running=STATE.scoutRunning;
   return `
   <div class="p-stats">
     <div class="p-stat"><span class="v" style="color:var(--gold)">${leads.length}</span><span class="l">FOUND</span></div>
@@ -1097,7 +1156,8 @@ function renderScoutPanel(){
     <div class="p-stat"><span class="v" style="color:var(--amber)">${leads.filter(l=>l.lead_temp==='HOT').length}</span><span class="l">HOT</span></div>
     <div class="p-stat"><span class="v" style="color:var(--red)">${STATE.binned.length}</span><span class="l">BIN</span></div>
   </div>
-  ${STATE.scoutRunning?`<div class="running-badge active"><div class="rb-dot"></div>SCOUT SCANNING</div>`:''}
+  ${running?`<div class="running-badge active"><div class="rb-dot"></div>SCOUT SCANNING — ${STATE.scoutLocation||''} / ${STATE.scoutNiche||''}</div>`:''}
+  ${!running?`
   <div class="p-section">
     <span class="p-label">Location</span>
     <div class="ac-wrap">
@@ -1130,8 +1190,8 @@ function renderScoutPanel(){
       </optgroup>
     </select>
   </div>
-  <button class="p-btn" onclick="startScout()" ${STATE.scoutRunning?'disabled':''}>⬡ ${STATE.scoutRunning?'SCANNING...':'INITIATE SCOUT'}</button>
-  <button class="p-btn stop" onclick="stopScout()" ${!STATE.scoutRunning?'disabled':''}>⬛ STOP</button>
+  <button class="p-btn" onclick="startScout()">⬡ INITIATE SCOUT</button>`
+  :`<button class="p-btn stop" onclick="stopScout()">⬛ STOP SCOUT</button>`}
   <div class="p-progress" id="prog-SCOUT"><div class="p-progress-label" id="progl-SCOUT"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SCOUT"></div></div></div>
   <div class="p-log" id="log-SCOUT"></div>
   <div class="p-table-wrap">
@@ -1155,14 +1215,15 @@ function renderForgePanel(){
     <div class="p-stat"><span class="v" style="color:var(--green)">${q.filter(i=>i.status==='saved').length}</span><span class="l">BUILT</span></div>
     <div class="p-stat"><span class="v" style="color:var(--red)">${q.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div>
   </div>
-  ${STATE.forgeRunning?`<div class="running-badge active"><div class="rb-dot"></div>FORGE BUILDING</div>`:''}
-  <div class="pipeline-note">FORGE pulls from SCOUT leads and builds sites automatically. Sites are saved to Supabase for LAUNCH.</div>
+  ${STATE.forgeRunning?`<div class="running-badge active"><div class="rb-dot"></div>FORGE BUILDING SITES</div>`:''}
+  <div class="pipeline-note">FORGE pulls from SCOUT leads and builds sites automatically.</div>
+  ${!STATE.forgeRunning?`
   <div class="p-section">
     <span class="p-label">Max Builds</span>
     <select class="p-select" id="forge-max"><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="999">All</option></select>
   </div>
-  <button class="p-btn" onclick="startForge()" ${STATE.forgeRunning?'disabled':''}>🔴 ${STATE.forgeRunning?'BUILDING...':'INITIATE FORGE'}</button>
-  <button class="p-btn stop" onclick="()=>{STATE.forgeStopped=true}" ${!STATE.forgeRunning?'disabled':''}>⬛ STOP</button>
+  <button class="p-btn" onclick="startForge()">🔴 INITIATE FORGE</button>`
+  :`<button class="p-btn stop" onclick="STATE.forgeStopped=true">⬛ STOP FORGE</button>`}
   <div class="p-progress" id="prog-FORGE"><div class="p-progress-label" id="progl-FORGE"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-FORGE"></div></div></div>
   <div class="p-log" id="log-FORGE"></div>
   <div class="p-table-wrap">
@@ -1186,9 +1247,10 @@ function renderLaunchPanel(){
     <div class="p-stat"><span class="v" style="color:var(--green)">${q.filter(i=>i.status==='live').length}</span><span class="l">LIVE</span></div>
     <div class="p-stat"><span class="v" style="color:var(--red)">${q.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div>
   </div>
-  ${STATE.launchRunning?`<div class="running-badge active"><div class="rb-dot"></div>LAUNCH DEPLOYING</div>`:''}
+  ${STATE.launchRunning?`<div class="running-badge active"><div class="rb-dot"></div>LAUNCH DEPLOYING SITES</div>`:''}
   <div class="pipeline-note">LAUNCH pulls built sites from forge_output and deploys them to GitHub Pages automatically.</div>
-  <button class="p-btn" onclick="startLaunch()" ${STATE.launchRunning?'disabled':''}>🟢 ${STATE.launchRunning?'DEPLOYING...':'INITIATE LAUNCH'}</button>
+  ${!STATE.launchRunning?`<button class="p-btn" onclick="startLaunch()">🟢 INITIATE LAUNCH</button>`
+  :`<button class="p-btn stop" onclick="STATE.launchStopped=true">⬛ STOP LAUNCH</button>`}
   <div class="p-progress" id="prog-LAUNCH"><div class="p-progress-label" id="progl-LAUNCH"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-LAUNCH"></div></div></div>
   <div class="p-log" id="log-LAUNCH"></div>
   <div class="p-table-wrap">
@@ -1212,9 +1274,10 @@ function renderScannerPanel(){
     <div class="p-stat"><span class="v" style="color:var(--red)">${q.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div>
     <div class="p-stat"><span class="v" style="color:var(--amber)">${q.filter(i=>i.status==='requeued').length}</span><span class="l">REQUEUED</span></div>
   </div>
-  ${STATE.scannerRunning?`<div class="running-badge active"><div class="rb-dot"></div>SCANNER CHECKING</div>`:''}
+  ${STATE.scannerRunning?`<div class="running-badge active"><div class="rb-dot"></div>SCANNER CHECKING SITES</div>`:''}
   <div class="pipeline-note">SCANNER checks every live site before emails are sent. Approved sites go to DISPATCH queue automatically.</div>
-  <button class="p-btn" onclick="startScanner()" ${STATE.scannerRunning?'disabled':''}>🖤 ${STATE.scannerRunning?'SCANNING...':'INITIATE SCANNER'}</button>
+  ${!STATE.scannerRunning?`<button class="p-btn" onclick="startScanner()">🖤 INITIATE SCANNER</button>`
+  :`<button class="p-btn stop" onclick="STATE.scannerStopped=true">⬛ STOP SCANNER</button>`}
   <div class="p-progress" id="prog-SCANNER"><div class="p-progress-label" id="progl-SCANNER"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SCANNER"></div></div></div>
   <div class="p-log" id="log-SCANNER"></div>
   <div class="p-table-wrap">
@@ -1237,7 +1300,16 @@ function renderDispatchPanel(){
     <div class="p-stat"><span class="v" style="color:var(--red)">0</span><span class="l">BOUNCED</span></div>
     <div class="p-stat"><span class="v" style="color:var(--dispatch)">david@</span><span class="l">INBOX</span></div>
   </div>
-  ${STATE.dispatchRunning?`<div class="running-badge active"><div class="rb-dot"></div>DISPATCH SENDING</div>`:''}
+  ${STATE.dispatchRunning?`<div class="running-badge active"><div class="rb-dot"></div>DISPATCH SENDING EMAILS</div>`:''}
+  ${!STATE.instantlyKey?`<div style="background:rgba(255,51,85,0.06);border:1px solid rgba(255,51,85,0.2);border-radius:6px;padding:12px;margin-bottom:12px">
+    <div style="font-size:8px;letter-spacing:2px;color:#FF3355;margin-bottom:6px">⚠️ INSTANTLY API KEY REQUIRED</div>
+    <input class="p-input" id="instantly-key-input" type="password" placeholder="Paste your Instantly API key...">
+    <div style="font-size:8px;color:rgba(192,200,216,0.4);letter-spacing:1px;margin:6px 0 8px">Saved to this device only — never uploaded anywhere</div>
+    <button class="p-btn" style="margin:0" onclick="saveInstantlyKey()">💾 SAVE KEY TO DEVICE</button>
+  </div>`:`<div style="background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.15);border-radius:6px;padding:8px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:9px;color:var(--green);letter-spacing:1px">✓ API KEY SAVED ON DEVICE</span>
+    <button onclick="clearInstantlyKey()" style="background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:3px;color:#FF3355;font-size:8px;padding:3px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace">CLEAR</button>
+  </div>`}
   <div class="demo-box">
     <span class="demo-head">🎯 DEMO MODE</span>
     <div class="toggle-row">
@@ -1254,8 +1326,8 @@ function renderDispatchPanel(){
     <div class="delay-row"><span>Send Delay</span><span id="delay-label">${STATE.sendDelay||30}s between emails</span></div>
     <input type="range" id="delay-slider" min="10" max="120" value="${STATE.sendDelay||30}" oninput="STATE.sendDelay=parseInt(this.value);document.getElementById('delay-label').textContent=this.value+'s between emails'">
   </div>
-  <button class="p-btn" style="margin-top:12px" onclick="startDispatch()" ${STATE.dispatchRunning?'disabled':''}>🟠 ${STATE.dispatchRunning?'SENDING...':'INITIATE DISPATCH'}</button>
-  <button class="p-btn stop" onclick="STATE.dispatchStopped=true" ${!STATE.dispatchRunning?'disabled':''}>⬛ STOP</button>
+  ${!STATE.dispatchRunning?`<button class="p-btn" style="margin-top:12px" onclick="startDispatch()">🟠 INITIATE DISPATCH</button>`
+  :`<button class="p-btn stop" style="margin-top:12px" onclick="STATE.dispatchStopped=true">⬛ STOP DISPATCH</button>`}
   <div class="p-progress" id="prog-DISPATCH"><div class="p-progress-label" id="progl-DISPATCH"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-DISPATCH"></div></div></div>
   <div class="p-log" id="log-DISPATCH"></div>
   <div class="p-table-wrap">
@@ -1278,10 +1350,10 @@ function renderSentinelPanel(){
     <div class="p-stat"><span class="v" style="color:var(--blue)">1</span><span class="l">DOMAINS</span></div>
     <div class="p-stat"><span class="v" style="color:var(--green)">9.8</span><span class="l">HEALTH</span></div>
   </div>
-  ${STATE.sentinelRunning?`<div class="running-badge active"><div class="rb-dot"></div>SENTINEL SEARCHING</div>`:''}
-  <div class="pipeline-note">SENTINEL searches 6 sources for emails of leads SCOUT couldn't find. Also monitors inbox health across all domains.</div>
-  <button class="p-btn" onclick="startSentinel()" ${STATE.sentinelRunning?'disabled':''}>💎 ${STATE.sentinelRunning?'SEARCHING...':'INITIATE SENTINEL'}</button>
-  <button class="p-btn stop" onclick="STATE.sentinelStopped=true" ${!STATE.sentinelRunning?'disabled':''}>⬛ STOP</button>
+  ${STATE.sentinelRunning?`<div class="running-badge active"><div class="rb-dot"></div>SENTINEL SEARCHING EMAILS</div>`:''}
+  <div class="pipeline-note">SENTINEL searches 6 sources for emails of leads SCOUT couldn't find.</div>
+  ${!STATE.sentinelRunning?`<button class="p-btn" onclick="startSentinel()">💎 INITIATE SENTINEL</button>`
+  :`<button class="p-btn stop" onclick="STATE.sentinelStopped=true">⬛ STOP SENTINEL</button>`}
   <div class="p-progress" id="prog-SENTINEL"><div class="p-progress-label" id="progl-SENTINEL"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SENTINEL"></div></div></div>
   <div class="p-log" id="log-SENTINEL"></div>
   <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:8px">DOMAIN HEALTH</div>
@@ -1573,7 +1645,7 @@ async function startDispatch(){
       addLog('DISPATCH',`Sending to: ${toEmail}`,'i');
 
       try{
-        const INSTANTLY_KEY='ODJjOTY2MjAtOTlhMS00ZDYyLTk0OWYtYTBiMmUzNGI1NWRmOlhwR3V3WXBpdURvVw==';
+        const INSTANTLY_KEY=STATE.instantlyKey||'';
         if(STATE.demoMode){
           // DEMO — send to demo email via Instantly
           addLog('DISPATCH',`Sending demo email to: ${toEmail}`,'i');
