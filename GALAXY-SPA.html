@@ -326,9 +326,12 @@ function onDragEnd(x,y,targetEl){
   orbitVelocity*=0.8;
 }
 
-// Touch events on canvas layer (behind nodes but drag still captured)
+// Only start drag if touch/click is on background — not on a node
+function isOnNode(el){return el?.closest('.agent-node')!=null}
+
 document.addEventListener('touchstart',e=>{
   if(document.getElementById('agent-panel').classList.contains('open'))return;
+  if(isOnNode(e.target))return;
   if(e.touches.length===1)onDragStart(e.touches[0].clientX,e.touches[0].clientY);
 },{passive:true});
 document.addEventListener('touchmove',e=>{
@@ -338,12 +341,13 @@ document.addEventListener('touchmove',e=>{
 document.addEventListener('touchend',e=>{
   if(document.getElementById('agent-panel').classList.contains('open'))return;
   const t=e.changedTouches[0];
-  onDragEnd(t.clientX,t.clientY,document.elementFromPoint(t.clientX,t.clientY));
+  onDragEnd(t.clientX,t.clientY);
 },{passive:true});
 
 // Mouse events for desktop
 document.addEventListener('mousedown',e=>{
   if(document.getElementById('agent-panel').classList.contains('open'))return;
+  if(isOnNode(e.target))return;
   if(e.button===0)onDragStart(e.clientX,e.clientY);
 });
 document.addEventListener('mousemove',e=>{
@@ -352,7 +356,7 @@ document.addEventListener('mousemove',e=>{
 });
 document.addEventListener('mouseup',e=>{
   if(!dragActive)return;
-  onDragEnd(e.clientX,e.clientY,e.target);
+  onDragEnd(e.clientX,e.clientY);
 });
 
 // Nodes always open on click/tap
