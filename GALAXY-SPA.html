@@ -16,6 +16,96 @@
 }
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--silver)}
 
+/* PIPELINE TOAST */
+#pipeline-toast{
+  position:fixed;top:70px;left:50%;transform:translateX(-50%);
+  z-index:150;
+  background:rgba(0,180,216,0.12);
+  border:1px solid rgba(0,180,216,0.3);
+  border-radius:20px;
+  padding:8px 18px;
+  font-size:9px;letter-spacing:2px;
+  color:#00B4D8;
+  display:none;
+  pointer-events:none;
+  white-space:nowrap;
+}
+#pipeline-toast.visible{display:block}
+
+/* PIPELINE MINI LOG */
+#pipeline-mini-log{
+  position:fixed;bottom:80px;left:16px;
+  z-index:150;width:calc(100% - 80px);max-width:340px;
+  background:rgba(6,10,24,0.95);
+  border:1px solid rgba(0,180,216,0.15);
+  border-radius:8px;
+  padding:10px 12px;
+  font-size:8px;
+  display:none;
+  pointer-events:none;
+  max-height:80px;overflow:hidden;
+}
+#pipeline-mini-log.visible{display:block}
+.pml-line{padding:1px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+
+/* MACHINE SWITCH */
+#machine-switch-wrap{
+  position:fixed;right:0;top:50%;transform:translateY(-50%);
+  z-index:100;display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:16px 10px;
+  background:rgba(6,10,24,0.95);
+  border:1px solid rgba(74,179,255,0.12);
+  border-right:none;
+  border-radius:12px 0 0 12px;
+  backdrop-filter:blur(12px);
+}
+.switch-label{
+  font-family:'Orbitron',sans-serif;font-size:6px;letter-spacing:2px;
+  color:rgba(192,200,216,0.35);writing-mode:vertical-rl;text-orientation:mixed;
+  text-transform:uppercase;
+}
+#machine-switch{
+  position:relative;width:28px;height:60px;
+  background:rgba(1,2,8,0.9);
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.1);
+  cursor:pointer;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,0.8);
+  transition:border-color 0.3s;
+}
+#machine-switch.on{border-color:rgba(0,255,136,0.4)}
+#machine-switch-thumb{
+  position:absolute;left:4px;width:20px;height:20px;
+  background:linear-gradient(145deg,#3a3a4a,#1a1a2a);
+  border-radius:50%;
+  top:32px;
+  transition:top 0.25s cubic-bezier(.4,0,.2,1),background 0.3s,box-shadow 0.3s;
+  border:1px solid rgba(255,255,255,0.15);
+  box-shadow:0 2px 6px rgba(0,0,0,0.6);
+}
+#machine-switch.on #machine-switch-thumb{
+  top:4px;
+  background:linear-gradient(145deg,#00FF88,#00cc6a);
+  box-shadow:0 0 12px rgba(0,255,136,0.6),0 2px 6px rgba(0,0,0,0.4);
+  border-color:rgba(0,255,136,0.5);
+}
+#switch-glow{
+  width:8px;height:8px;border-radius:50%;
+  background:rgba(255,255,255,0.1);
+  transition:background 0.3s,box-shadow 0.3s;
+  margin-top:2px;
+}
+#switch-glow.on{
+  background:#00FF88;
+  box-shadow:0 0 8px rgba(0,255,136,0.8);
+}
+#switch-state{
+  font-family:'Orbitron',sans-serif;font-size:6px;letter-spacing:1px;
+  color:rgba(192,200,216,0.3);writing-mode:vertical-rl;
+  transition:color 0.3s;
+}
+#switch-state.on{color:#00FF88}
+
 /* CANVAS LAYERS */
 #three-canvas{position:fixed;inset:0;z-index:0}
 #conn-canvas{position:fixed;inset:0;z-index:1;pointer-events:none}
@@ -183,6 +273,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
   <div id="clock"></div>
 </div>
 
+<!-- MACHINE SWITCH -->
+<div id="machine-switch-wrap">
+  <span class="switch-label">MACHINE</span>
+  <div id="machine-switch" onclick="toggleMachineSwitch()">
+    <div id="machine-switch-thumb"></div>
+  </div>
+  <div id="switch-glow"></div>
+  <span id="switch-state">OFF</span>
+</div>
+
 <!-- BOTTOM BAR -->
 <div id="bottombar">
   <div class="bstat"><span class="bval" id="b-leads" style="color:var(--galaxy)">0</span><span class="blbl">LEADS</span></div>
@@ -190,6 +290,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
   <div class="bstat"><span class="bval" id="b-live" style="color:var(--launch)">0</span><span class="blbl">LIVE</span></div>
   <div class="bstat"><span class="bval" id="b-sent" style="color:var(--dispatch)">0</span><span class="blbl">SENT</span></div>
 </div>
+
+<!-- PIPELINE TOAST -->
+<div id="pipeline-toast"></div>
+
+<!-- PIPELINE MINI LOG -->
+<div id="pipeline-mini-log"></div>
 
 <!-- AGENT PANEL -->
 <div id="panel-backdrop" onclick="closePanel()"></div>
@@ -426,6 +532,426 @@ function hexAlpha(hex,a){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slic
 window.addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();resCC()});
 setInterval(()=>document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8),1000);
 document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8);
+
+// ═══════════════════════════════════════════
+// GALAXY HOLD — FULL PIPELINE ACTIVATION
+// ═══════════════════════════════════════════
+let galaxyHoldTimer=null;
+let pipelineRunning=false;
+let pipelineStopped=false;
+
+// Hold indicator ring
+const holdRing=document.createElement('div');
+holdRing.style.cssText='position:fixed;z-index:500;border-radius:50%;border:2px solid #00B4D8;pointer-events:none;display:none;transform:translate(-50%,-50%)';
+document.body.appendChild(holdRing);
+
+function showHoldProgress(x,y,progress){
+  const size=80+progress*20;
+  holdRing.style.display='block';
+  holdRing.style.left=x+'px';holdRing.style.top=y+'px';
+  holdRing.style.width=size+'px';holdRing.style.height=size+'px';
+  holdRing.style.opacity=progress;
+  holdRing.style.boxShadow=`0 0 ${20*progress}px rgba(0,180,216,${progress})`;
+}
+function hideHoldRing(){
+  holdRing.style.display='none';
+}
+
+// Add hold detection to GALAXY node
+function initGalaxyHold(){
+  const galaxyNode=nodeEls['GALAXY'];
+  if(!galaxyNode)return;
+  let holdX=0,holdY=0,holdProgress=0,holdInterval=null;
+
+  function startHold(x,y){
+    if(pipelineRunning)return;
+    holdX=x;holdY=y;holdProgress=0;
+    holdInterval=setInterval(()=>{
+      holdProgress+=0.033; // fills in ~1 second
+      showHoldProgress(holdX,holdY,Math.min(holdProgress,1));
+      if(holdProgress>=1){
+        clearInterval(holdInterval);
+        hideHoldRing();
+        activatePipeline();
+      }
+    },33);
+  }
+  function cancelHold(){
+    clearInterval(holdInterval);
+    holdInterval=null;
+    hideHoldRing();
+  }
+
+  galaxyNode.addEventListener('touchstart',e=>{
+    e.stopPropagation();
+    const t=e.touches[0];
+    startHold(t.clientX,t.clientY);
+  },{passive:true});
+  galaxyNode.addEventListener('touchend',e=>{e.stopPropagation();cancelHold()},{passive:true});
+  galaxyNode.addEventListener('touchcancel',e=>{e.stopPropagation();cancelHold()},{passive:true});
+  galaxyNode.addEventListener('mousedown',e=>{e.stopPropagation();startHold(e.clientX,e.clientY)});
+  galaxyNode.addEventListener('mouseup',e=>{e.stopPropagation();cancelHold()});
+  galaxyNode.addEventListener('mouseleave',e=>{cancelHold()});
+  // Override the touchstart openPanel — GALAXY opens modal not panel
+  galaxyNode.onclick=null;
+}
+
+// ACTIVATION MODAL
+const activationModal=document.createElement('div');
+activationModal.style.cssText='position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:rgba(1,2,8,0.9);backdrop-filter:blur(8px)';
+activationModal.innerHTML=`
+<div style="background:rgba(6,10,24,0.98);border:1px solid rgba(0,180,216,0.3);border-radius:16px;padding:28px 24px;width:calc(100% - 48px);max-width:420px">
+  <div style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;color:#00B4D8;letter-spacing:4px;margin-bottom:4px">🧠 GALAXY</div>
+  <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:24px">FULL PIPELINE ACTIVATION</div>
+  
+  <div style="margin-bottom:16px">
+    <div style="font-size:8px;letter-spacing:2px;color:#4AB3FF;margin-bottom:6px">TARGET LOCATION</div>
+    <div style="position:relative">
+      <input id="galaxy-location" style="background:rgba(1,2,8,0.8);border:1px solid rgba(0,180,216,0.2);border-radius:4px;padding:11px 14px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;width:100%" placeholder="Start typing town..." oninput="handleGalaxyAC(this.value)" onkeydown="handleGalaxyACKey(event)">
+      <div id="galaxy-ac-list" style="position:absolute;top:100%;left:0;right:0;z-index:700;background:#0a0f1e;border:1px solid #00B4D8;border-top:none;border-radius:0 0 4px 4px;max-height:160px;overflow-y:auto;display:none"></div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:24px">
+    <div style="font-size:8px;letter-spacing:2px;color:#4AB3FF;margin-bottom:6px">TARGET NICHE</div>
+    <select id="galaxy-niche" style="background:rgba(1,2,8,0.8);border:1px solid rgba(0,180,216,0.2);border-radius:4px;padding:11px 14px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;width:100%">
+      <option value="">— Select niche —</option>
+      <optgroup label="Food & Drink">
+        <option value="restaurant">Restaurants</option>
+        <option value="cafe">Cafes</option>
+        <option value="bar">Bars & Pubs</option>
+        <option value="fast_food">Fast Food</option>
+        <option value="bakery">Bakeries</option>
+      </optgroup>
+      <optgroup label="Health & Beauty">
+        <option value="pharmacy">Pharmacies</option>
+        <option value="hairdresser">Barbers & Hair</option>
+        <option value="beauty">Beauty Salons</option>
+        <option value="dentist">Dentists</option>
+        <option value="gym">Gyms</option>
+      </optgroup>
+      <optgroup label="Trades">
+        <option value="car_repair">Car Repair</option>
+        <option value="clothes">Clothing</option>
+        <option value="convenience">Convenience</option>
+      </optgroup>
+    </select>
+  </div>
+
+  <div style="background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);border-radius:6px;padding:12px;margin-bottom:20px">
+    <div style="font-size:8px;letter-spacing:2px;color:#FFAA00;margin-bottom:8px">🎯 DEMO MODE</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <button id="galaxy-demo-toggle" style="width:34px;height:18px;background:rgba(255,255,255,0.1);border-radius:9px;cursor:pointer;position:relative;transition:background 0.3s;border:none" onclick="toggleGalaxyDemo()"></button>
+      <span id="galaxy-demo-label" style="font-size:10px;color:rgba(192,200,216,0.6);font-family:'Share Tech Mono',monospace">OFF — sends to real businesses</span>
+    </div>
+    <input id="galaxy-demo-email" type="email" placeholder="your@email.com" style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,170,0,0.2);border-radius:4px;padding:9px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;display:none">
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <button onclick="closeActivationModal()" style="padding:13px;background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:4px;color:rgba(192,200,216,0.5);font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;cursor:pointer">CANCEL</button>
+    <button onclick="confirmActivation()" style="padding:13px;background:transparent;border:1px solid #00B4D8;border-radius:4px;color:#00B4D8;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;cursor:pointer;box-shadow:0 0 12px rgba(0,180,216,0.2)">🧠 ACTIVATE</button>
+  </div>
+
+  <!-- PIPELINE STATUS — shown after activation -->
+  <div id="pipeline-status" style="display:none;margin-top:20px;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px">
+    <div id="pipeline-log" style="background:rgba(1,2,8,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:4px;padding:10px;height:120px;overflow-y:auto;font-size:9px;font-family:'Share Tech Mono',monospace;margin-bottom:12px"></div>
+    <button onclick="stopPipeline()" style="width:100%;padding:11px;background:transparent;border:1px solid #FF3355;border-radius:4px;color:#FF3355;font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;cursor:pointer">⬛ STOP PIPELINE</button>
+  </div>
+</div>`;
+document.body.appendChild(activationModal);
+
+let galaxyDemoOn=false;
+function toggleGalaxyDemo(){
+  galaxyDemoOn=!galaxyDemoOn;
+  const btn=document.getElementById('galaxy-demo-toggle');
+  const lbl=document.getElementById('galaxy-demo-label');
+  const inp=document.getElementById('galaxy-demo-email');
+  btn.style.background=galaxyDemoOn?'#FFAA00':'rgba(255,255,255,0.1)';
+  btn.style.setProperty('--after-left',galaxyDemoOn?'19px':'3px');
+  lbl.textContent=galaxyDemoOn?'ON — emails go to demo address':'OFF — sends to real businesses';
+  inp.style.display=galaxyDemoOn?'block':'none';
+}
+
+// Galaxy AC
+let galaxyACIndex=-1;
+function handleGalaxyAC(val){
+  const list=document.getElementById('galaxy-ac-list');
+  galaxyACIndex=-1;
+  if(val.length<3){list.style.display='none';list.innerHTML='';return}
+  const m=UK_TOWNS.filter(t=>t.toLowerCase().startsWith(val.toLowerCase())).slice(0,7);
+  if(!m.length){list.style.display='none';return}
+  list.innerHTML=m.map(t=>`<div onclick="selectGalaxyTown('${t}')" style="padding:8px 12px;font-size:11px;cursor:pointer;color:#C0C8D8;border-bottom:1px solid rgba(74,179,255,0.05);font-family:'Share Tech Mono',monospace" onmouseover="this.style.background='rgba(74,179,255,0.1)'" onmouseout="this.style.background=''">${t}</div>`).join('');
+  list.style.display='block';
+}
+function handleGalaxyACKey(e){
+  const list=document.getElementById('galaxy-ac-list');
+  const items=list.querySelectorAll('div');
+  if(e.key==='ArrowDown'){galaxyACIndex=Math.min(galaxyACIndex+1,items.length-1)}
+  else if(e.key==='ArrowUp'){galaxyACIndex=Math.max(galaxyACIndex-1,0)}
+  else if(e.key==='Enter'){e.preventDefault();if(items[galaxyACIndex])selectGalaxyTown(items[galaxyACIndex].textContent)}
+  else if(e.key==='Escape'){list.style.display='none'}
+}
+function selectGalaxyTown(town){
+  document.getElementById('galaxy-location').value=town;
+  document.getElementById('galaxy-ac-list').style.display='none';
+}
+
+function activatePipeline(){
+  activationModal.style.display='flex';
+}
+function closeActivationModal(){
+  if(!pipelineRunning){
+    activationModal.style.display='none';
+    galaxyDemoOn=false;
+    resetSwitch();
+  }
+}
+
+function pipelineLog(msg,type='i'){
+  const el=document.getElementById('pipeline-log');
+  if(el){
+    const time=new Date().toTimeString().slice(0,8);
+    const colors={s:'#00FF88',w:'#FFAA00',e:'#FF3355',i:'#4AB3FF'};
+    el.innerHTML=`<div style="color:${colors[type]||colors.i};padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)">[${time}] ${msg}</div>`+el.innerHTML;
+  }
+  // Always update mini log on dashboard
+  updateMiniLog(msg,type);
+  // Update toast with latest stage
+  if(type==='s'||type==='i')showPipelineToast(msg.length>50?msg.slice(0,50)+'...':msg);
+}
+
+function stopPipeline(){
+  pipelineStopped=true;
+  STATE.scoutStopped=true;
+  STATE.forgeStopped=true;
+  STATE.launchStopped=true;
+  STATE.scannerStopped=true;
+  STATE.dispatchStopped=true;
+  pipelineLog('⬛ PIPELINE STOPPED BY USER','w');
+  pipelineRunning=false;
+  setNodeStatus('SCOUT','IDLE');
+  setNodeStatus('FORGE','IDLE');
+  setNodeStatus('LAUNCH','IDLE');
+  setNodeStatus('SCANNER','IDLE');
+  setNodeStatus('DISPATCH','IDLE');
+  setTimeout(()=>{
+    activationModal.style.display='none';
+    document.getElementById('pipeline-status').style.display='none';
+  },2000);
+}
+
+async function confirmActivation(){
+  const location=document.getElementById('galaxy-location')?.value?.trim();
+  const niche=document.getElementById('galaxy-niche').value;
+  const demoEmail=document.getElementById('galaxy-demo-email').value.trim();
+
+  if(!location){document.getElementById('galaxy-location').style.borderColor='#FF3355';return}
+  if(!niche){document.getElementById('galaxy-niche').style.borderColor='#FF3355';return}
+  if(galaxyDemoOn&&!demoEmail){document.getElementById('galaxy-demo-email').style.borderColor='#FF3355';return}
+
+  // Set global state
+  STATE.scoutLocation=location;
+  STATE.scoutNiche=niche;
+  STATE.demoMode=galaxyDemoOn;
+  STATE.demoEmail=demoEmail;
+
+  pipelineRunning=true;
+  pipelineStopped=false;
+
+  // Close modal — let user watch dashboard while pipeline runs
+  activationModal.style.display='none';
+
+  // Show a small status toast
+  showPipelineToast(`🧠 GALAXY ACTIVE — ${location} / ${niche}`);
+
+  pipelineLog(`🧠 GALAXY ACTIVATED — ${location} / ${niche}`,'s');
+  pipelineLog(galaxyDemoOn?`Demo mode ON → ${demoEmail}`:'Live mode — sending to real businesses','w');
+
+  // ── STAGE 1: SCOUT ──
+  pipelineLog('🔵 SCOUT initiating...','i');
+  setNodeStatus('SCOUT','RUNNING');
+  await runScoutForPipeline(location, niche);
+  if(pipelineStopped)return;
+  pipelineLog(`🔵 SCOUT complete — ${STATE.leads.length} leads found`,'s');
+
+  // ── STAGE 2: FORGE ──
+  pipelineLog('🔴 FORGE initiating...','i');
+  await runForgeForPipeline();
+  if(pipelineStopped)return;
+  pipelineLog(`🔴 FORGE complete — ${STATE.forgeQueue.filter(i=>i.status==='saved').length} sites built`,'s');
+
+  // ── STAGE 3: LAUNCH ──
+  pipelineLog('🟢 LAUNCH initiating...','i');
+  await runLaunchForPipeline();
+  if(pipelineStopped)return;
+  pipelineLog(`🟢 LAUNCH complete — ${STATE.launchQueue.filter(i=>i.status==='live').length} sites live`,'s');
+
+  // ── STAGE 4: SCANNER ──
+  pipelineLog('🖤 SCANNER initiating...','i');
+  await startScanner();
+  if(pipelineStopped)return;
+  pipelineLog(`🖤 SCANNER complete — ${STATE.scannerQueue.filter(i=>i.status==='approved').length} approved`,'s');
+
+  // ── STAGE 5: DISPATCH ──
+  pipelineLog('🟠 DISPATCH initiating...','i');
+  await startDispatch();
+  pipelineLog(`🟠 DISPATCH complete — ${STATE.sentLog.length} emails sent`,'s');
+
+  pipelineRunning=false;
+  pipelineLog('✅ GALAXY PIPELINE COMPLETE','s');
+  addLog('SAM',`Pipeline complete — ${location}/${niche} — ${STATE.sentLog.length} sent`,'s');
+  
+  // Reset switch and hide overlays after 3s
+  setTimeout(()=>{
+    resetSwitch();
+    hidePipelineToast();
+    document.getElementById('pipeline-mini-log').classList.remove('visible');
+  },3000);
+}
+
+// Pipeline versions of scout/forge/launch that use state directly
+async function runScoutForPipeline(location, niche){
+  STATE.leads=[];STATE.binned=[];STATE.scoutStopped=false;
+  try{
+    const res=await fetch(`https://bizdata-web.vercel.app/api/businesses?location=${encodeURIComponent(location)}&category=${niche}&limit=500`);
+    const data=await res.json();
+    const businesses=data.businesses||[];
+    pipelineLog(`BizData: ${businesses.length} businesses found`,'i');
+    for(let i=0;i<businesses.length;i++){
+      if(pipelineStopped)break;
+      const biz=businesses[i];
+      let email=biz.email||'';
+      if(!email&&biz.website){
+        const html=await scrapeUrl(biz.website);
+        email=extractEmails(html)[0]||'';
+      }
+      const lead={name:biz.name||'',address:biz.address||'',phone:biz.phone||'',website:biz.website||'',email,niche,location,lead_temp:!biz.website&&!email?'HOT':email?'WARM':'COLD',email_found:!!email,created_at:new Date().toISOString()};
+      try{const saved=await sbInsert('scout_leads',lead);lead.id=saved?.id}catch{}
+      if(email)STATE.leads.push(lead);
+      else STATE.binned.push(lead);
+      if(i%5===0)pipelineLog(`SCOUT: ${i+1}/${businesses.length} processed`,'i');
+      await new Promise(r=>setTimeout(r,200));
+    }
+    STATE.stats.leads=STATE.leads.length;updateBottomBar();
+    setNodeStatus('SCOUT','DONE');
+  }catch(e){pipelineLog(`SCOUT error: ${e.message}`,'e');setNodeStatus('SCOUT','ERROR')}
+}
+
+async function runForgeForPipeline(){
+  STATE.forgeQueue=[];STATE.forgeStopped=false;
+  try{
+    const leads=await sbGet('scout_leads',`select=*&order=created_at.desc&limit=10`);
+    if(!leads.length){pipelineLog('FORGE: No leads found','w');return}
+    STATE.forgeQueue=leads.map(l=>({...l,status:'queued'}));
+    for(let i=0;i<STATE.forgeQueue.length;i++){
+      if(pipelineStopped)break;
+      const item=STATE.forgeQueue[i];
+      item.status='building';
+      try{
+        const html=buildSiteHTML(item);
+        const saved=await sbInsert('forge_output',{lead_id:item.id,business_name:item.name,html,status:'ready'});
+        item.forge_id=saved?.id;item.status='saved';
+        STATE.stats.built++;updateBottomBar();
+        pipelineLog(`FORGE: Built ${item.name}`,'i');
+      }catch(e){item.status='failed'}
+      await new Promise(r=>setTimeout(r,200));
+    }
+    setNodeStatus('FORGE','DONE');
+  }catch(e){pipelineLog(`FORGE error: ${e.message}`,'e')}
+}
+
+async function runLaunchForPipeline(){
+  STATE.launchQueue=[];STATE.launchStopped=false;
+  try{
+    const sites=await sbGet('forge_output','status=eq.ready&order=created_at.asc&limit=10&select=*');
+    if(!sites.length){pipelineLog('LAUNCH: No sites ready','w');return}
+    STATE.launchQueue=sites.map(s=>({...s,status:'queued',url:null}));
+    for(let i=0;i<STATE.launchQueue.length;i++){
+      if(pipelineStopped)break;
+      const item=STATE.launchQueue[i];
+      item.status='deploying';
+      try{
+        const repo=`galaxy-${slugify(item.business_name)}`;
+        const url=`https://${GITHUB_USER}.github.io/${repo}/`;
+        item.repo=repo;item.url=url;
+        try{await githubReq('/user/repos','POST',{name:repo,private:false,auto_init:false})}catch{}
+        await new Promise(r=>setTimeout(r,1500));
+        const encoded=btoa(unescape(encodeURIComponent(item.html)));
+        let sha=null;
+        try{const ex=await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`);sha=ex?.sha}catch{}
+        const pb={message:'GALAXY LAUNCH',content:encoded};if(sha)pb.sha=sha;
+        await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`,'PUT',pb);
+        try{await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch:'main',path:'/'}})}catch{}
+        const saved=await sbInsert('launch_output',{forge_id:item.id,business_name:item.business_name,github_repo:repo,live_url:url,status:'live'});
+        item.launch_id=saved?.id;
+        await sbUpdate('forge_output',item.id,{status:'deployed'});
+        item.status='live';STATE.stats.live++;updateBottomBar();
+        pipelineLog(`LAUNCH: Live ${item.business_name}`,'i');
+      }catch(e){item.status='failed';pipelineLog(`LAUNCH failed: ${item.business_name}`,'e')}
+      await new Promise(r=>setTimeout(r,2000));
+    }
+    setNodeStatus('LAUNCH','DONE');
+  }catch(e){pipelineLog(`LAUNCH error: ${e.message}`,'e')}
+}
+
+// Init hold on GALAXY node after nodes are built
+setTimeout(initGalaxyHold, 500);
+
+// ═══════════════════════════════════════════
+// PIPELINE TOAST & MINI LOG
+// ═══════════════════════════════════════════
+function showPipelineToast(msg){
+  const t=document.getElementById('pipeline-toast');
+  t.textContent=msg;
+  t.classList.add('visible');
+}
+function hidePipelineToast(){
+  document.getElementById('pipeline-toast').classList.remove('visible');
+}
+function updateMiniLog(msg,type='i'){
+  const el=document.getElementById('pipeline-mini-log');
+  el.classList.add('visible');
+  const colors={s:'#00FF88',w:'#FFAA00',e:'#FF3355',i:'#4AB3FF'};
+  const time=new Date().toTimeString().slice(0,8);
+  el.innerHTML=`<div class="pml-line" style="color:${colors[type]||colors.i}">[${time}] ${msg}</div>`+el.innerHTML;
+  // Keep only last 5 lines
+  const lines=el.querySelectorAll('.pml-line');
+  if(lines.length>5)lines[lines.length-1].remove();
+}
+
+// ═══════════════════════════════════════════
+// MACHINE SWITCH
+// ═══════════════════════════════════════════
+let machineOn = false;
+
+function toggleMachineSwitch(){
+  if(machineOn){
+    // TURN OFF
+    machineOn = false;
+    document.getElementById('machine-switch').classList.remove('on');
+    document.getElementById('switch-glow').classList.remove('on');
+    document.getElementById('switch-state').classList.remove('on');
+    document.getElementById('switch-state').textContent = 'OFF';
+    stopPipeline();
+  } else {
+    // TURN ON — show activation modal
+    machineOn = true;
+    document.getElementById('machine-switch').classList.add('on');
+    document.getElementById('switch-glow').classList.add('on');
+    document.getElementById('switch-state').classList.add('on');
+    document.getElementById('switch-state').textContent = 'ON';
+    activatePipeline();
+  }
+}
+
+// If pipeline is cancelled — reset switch
+function resetSwitch(){
+  machineOn = false;
+  document.getElementById('machine-switch').classList.remove('on');
+  document.getElementById('switch-glow').classList.remove('on');
+  document.getElementById('switch-state').classList.remove('on');
+  document.getElementById('switch-state').textContent = 'OFF';
+}
 
 // ═══════════════════════════════════════════
 // SUPABASE HELPERS
@@ -1047,11 +1573,39 @@ async function startDispatch(){
       addLog('DISPATCH',`Sending to: ${toEmail}`,'i');
 
       try{
-        // DEMO MODE — log only (no real send without Instantly API key)
+        const INSTANTLY_KEY='ODJjOTY2MjAtOTlhMS00ZDYyLTk0OWYtYTBiMmUzNGI1NWRmOlhwR3V3WXBpdURvVw==';
         if(STATE.demoMode){
-          addLog('DISPATCH',`DEMO SENT: ${item.business_name} → ${toEmail}`,'s');
+          // DEMO — send to demo email via Instantly
+          addLog('DISPATCH',`Sending demo email to: ${toEmail}`,'i');
+          const emailRes=await fetch('https://api.instantly.ai/api/v2/emails/send',{
+            method:'POST',
+            headers:{'Content-Type':'application/json','Authorization':`Bearer ${INSTANTLY_KEY}`},
+            body:JSON.stringify({
+              from:{'name':'The Website Inn','address':'david@thewebsiteinn.co.uk'},
+              to:[{'address':toEmail}],
+              subject:`${item.business_name} — We Built This For You`,
+              body:`<p>We built your website. See it live here:</p><p><a href="${item.live_url}">${item.live_url}</a></p><p>We came across ${item.business_name} and felt you were being underrepresented online. So we built something. No obligation. No catch. Just click the link.</p><p>If it's the standard you'd expect your business to be represented at — reply to this email and we'll get a call booked.</p><p>Yes this is a cold email. Before you close this — Google us, find us on Instagram, look us up on Companies House. We're a legitimate UK agency that builds websites for businesses who deserve better.</p><p>— The Website Inn<br>thewebsiteinn.co.uk</p>`
+            })
+          });
+          const emailData=await emailRes.json();
+          if(emailRes.ok){addLog('DISPATCH',`EMAIL SENT: ${item.business_name} → ${toEmail}`,'s')}
+          else{addLog('DISPATCH',`Instantly error: ${JSON.stringify(emailData)}`,'e')}
         } else {
-          addLog('DISPATCH','Live send — wire Instantly API key to enable','w');
+          // LIVE — send to real business email
+          addLog('DISPATCH',`Sending live email to: ${toEmail}`,'i');
+          const emailRes=await fetch('https://api.instantly.ai/api/v2/emails/send',{
+            method:'POST',
+            headers:{'Content-Type':'application/json','Authorization':`Bearer ${INSTANTLY_KEY}`},
+            body:JSON.stringify({
+              from:{'name':'The Website Inn','address':'david@thewebsiteinn.co.uk'},
+              to:[{'address':toEmail}],
+              subject:`${item.business_name} — We Built This For You`,
+              body:`<p>We built your website. See it live here:</p><p><a href="${item.live_url}">${item.live_url}</a></p><p>We came across ${item.business_name} and felt you were being underrepresented online. So we built something. No obligation. No catch. Just click the link.</p><p>If it's the standard you'd expect your business to be represented at — reply to this email and we'll get a call booked.</p><p>— The Website Inn<br>thewebsiteinn.co.uk</p>`
+            })
+          });
+          const emailData=await emailRes.json();
+          if(emailRes.ok){addLog('DISPATCH',`LIVE EMAIL SENT: ${item.business_name} → ${toEmail}`,'s')}
+          else{addLog('DISPATCH',`Instantly error: ${JSON.stringify(emailData)}`,'e')}
         }
         await sbUpdate('dispatch_queue',item.id,{status:'sent',sent_at:new Date().toISOString()});
         STATE.sentLog.push({business_name:item.business_name,to:toEmail,live_url:item.live_url});
