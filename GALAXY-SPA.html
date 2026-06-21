@@ -808,6 +808,114 @@ async function confirmActivation(){
   },3000);
 }
 
+// ═══════════════════════════════════════════
+// PARALLEL PIPELINE — fires as SCOUT finds leads
+// ═══════════════════════════════════════════
+const parallelQueue=[];
+let parallelRunning=false;
+
+async function triggerParallelPipeline(lead){
+  parallelQueue.push(lead);
+  if(parallelRunning)return; // already processing queue
+  parallelRunning=true;
+
+  while(parallelQueue.length>0&&!pipelineStopped){
+    const l=parallelQueue.shift();
+    try{
+      // FORGE — build site for this lead
+      pipelineLog(`🔴 FORGE: Building ${l.name}`,'i');
+      setNodeStatus('FORGE','RUNNING');
+      STATE.forgeRunning=true;
+      const html=buildSiteHTML(l);
+      const forgeRow=await sbInsert('forge_output',{lead_id:l.id,business_name:l.name,html,status:'ready'});
+      STATE.forgeQueue.push({...l,status:'saved',forge_id:forgeRow?.id});
+      STATE.stats.built++;updateBottomBar();
+      pipelineLog(`🔴 FORGE: Built ${l.name}`,'s');
+
+      if(pipelineStopped)break;
+
+      // LAUNCH — deploy this site
+      pipelineLog(`🟢 LAUNCH: Deploying ${l.name}`,'i');
+      setNodeStatus('LAUNCH','RUNNING');
+      STATE.launchRunning=true;
+      const repo=`galaxy-${slugify(l.name)}`;
+      const url=`https://${GITHUB_USER}.github.io/${repo}/`;
+      try{await githubReq('/user/repos','POST',{name:repo,private:false,auto_init:false})}catch{}
+      await new Promise(r=>setTimeout(r,1500));
+      const encoded=btoa(unescape(encodeURIComponent(html)));
+      let sha=null;
+      try{const ex=await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`);sha=ex?.sha}catch{}
+      const pb={message:'GALAXY LAUNCH',content:encoded};if(sha)pb.sha=sha;
+      await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`,'PUT',pb);
+      try{await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch:'main',path:'/'}})}catch{}
+      const launchRow=await sbInsert('launch_output',{forge_id:forgeRow?.id,business_name:l.name,github_repo:repo,live_url:url,status:'live'});
+      if(forgeRow?.id)await sbUpdate('forge_output',forgeRow.id,{status:'deployed'});
+      STATE.launchQueue.push({...l,status:'live',url});
+      STATE.stats.live++;updateBottomBar();
+      pipelineLog(`🟢 LAUNCH: Live ${l.name} → ${url}`,'s');
+
+      if(pipelineStopped)break;
+
+      // SCANNER — quick check
+      pipelineLog(`🖤 SCANNER: Checking ${l.name}`,'i');
+      setNodeStatus('SCANNER','RUNNING');
+      STATE.scannerRunning=true;
+      const checks={name:html.includes(l.name)&&!html.includes('{{'),url:true,email:!!l.email,phone:!!l.phone};
+      const approved=checks.name&&checks.url;
+      STATE.scannerQueue.push({...l,status:approved?'approved':'failed',checks,live_url:url});
+
+      if(approved){
+        await sbInsert('dispatch_queue',{business_name:l.name,email:l.email,live_url:url,template_used:'Template-01',status:'ready'});
+        STATE.dispatchQueue.push({business_name:l.name,email:l.email,live_url:url});
+        pipelineLog(`🖤 SCANNER: Approved ${l.name} → queue`,'s');
+
+        if(pipelineStopped)break;
+
+        // DISPATCH — send email
+        pipelineLog(`🟠 DISPATCH: Sending to ${l.name}`,'i');
+        setNodeStatus('DISPATCH','RUNNING');
+        STATE.dispatchRunning=true;
+        const toEmail=STATE.demoMode?STATE.demoEmail:l.email;
+        if(toEmail){
+          try{
+            const INSTANTLY_KEY=STATE.instantlyKey||'';
+            const emailRes=await fetch('https://api.instantly.ai/api/v2/emails/send',{
+              method:'POST',
+              headers:{'Content-Type':'application/json','Authorization':`Bearer ${INSTANTLY_KEY}`},
+              body:JSON.stringify({
+                from:{name:'The Website Inn',address:'david@thewebsiteinn.co.uk'},
+                to:[{address:toEmail}],
+                subject:`${l.name} — We Built This For You`,
+                body:`<p>We built your website. See it live here:</p><p><a href="${url}">${url}</a></p><p>We came across ${l.name} and felt you were being underrepresented online. So we built something. No obligation. No catch. Just click the link.</p><p>If it's the standard you'd expect your business to be represented at — reply to this email.</p><p>— The Website Inn<br>thewebsiteinn.co.uk</p>`
+              })
+            });
+            if(emailRes.ok){
+              STATE.sentLog.push({business_name:l.name,to:toEmail,live_url:url});
+              STATE.stats.sent++;updateBottomBar();
+              pipelineLog(`🟠 DISPATCH: Sent to ${toEmail}`,'s');
+              await sbUpdate('dispatch_queue',launchRow?.id,{status:'sent',sent_at:new Date().toISOString()});
+            } else {
+              const err=await emailRes.json();
+              pipelineLog(`🟠 DISPATCH: Error — ${JSON.stringify(err)}`,'e');
+            }
+          }catch(e){pipelineLog(`🟠 DISPATCH error: ${e.message}`,'e')}
+        }
+        // Delay between sends
+        const delay=(STATE.sendDelay||30)*1000;
+        await new Promise(r=>setTimeout(r,delay));
+      }
+    }catch(e){
+      pipelineLog(`Pipeline error for ${l.name}: ${e.message}`,'e');
+    }
+  }
+
+  parallelRunning=false;
+  STATE.forgeRunning=false;STATE.launchRunning=false;
+  STATE.scannerRunning=false;STATE.dispatchRunning=false;
+  setNodeStatus('FORGE','IDLE');setNodeStatus('LAUNCH','IDLE');
+  setNodeStatus('SCANNER','IDLE');setNodeStatus('DISPATCH','IDLE');
+}
+
 // Pipeline versions of scout/forge/launch that use state directly
 async function runScoutForPipeline(location, niche){
   STATE.leads=[];STATE.binned=[];STATE.scoutStopped=false;
@@ -826,9 +934,14 @@ async function runScoutForPipeline(location, niche){
       }
       const lead={name:biz.name||'',address:biz.address||'',phone:biz.phone||'',website:biz.website||'',email,niche,location,lead_temp:!biz.website&&!email?'HOT':email?'WARM':'COLD',email_found:!!email,created_at:new Date().toISOString()};
       try{const saved=await sbInsert('scout_leads',lead);lead.id=saved?.id}catch{}
-      if(email)STATE.leads.push(lead);
-      else STATE.binned.push(lead);
-      if(i%5===0)pipelineLog(`SCOUT: ${i+1}/${businesses.length} processed`,'i');
+      if(email){
+        STATE.leads.push(lead);
+        // ── PARALLEL PIPELINE ── trigger FORGE immediately for this lead
+        triggerParallelPipeline(lead);
+      } else {
+        STATE.binned.push(lead);
+      }
+      if(i%5===0)pipelineLog(`SCOUT: ${i+1}/${businesses.length} processed — ${STATE.leads.length} leads`,'i');
       await new Promise(r=>setTimeout(r,200));
     }
     STATE.stats.leads=STATE.leads.length;updateBottomBar();
@@ -1156,42 +1269,12 @@ function renderScoutPanel(){
     <div class="p-stat"><span class="v" style="color:var(--amber)">${leads.filter(l=>l.lead_temp==='HOT').length}</span><span class="l">HOT</span></div>
     <div class="p-stat"><span class="v" style="color:var(--red)">${STATE.binned.length}</span><span class="l">BIN</span></div>
   </div>
-  ${running?`<div class="running-badge active"><div class="rb-dot"></div>SCOUT SCANNING — ${STATE.scoutLocation||''} / ${STATE.scoutNiche||''}</div>`:''}
-  ${!running?`
-  <div class="p-section">
-    <span class="p-label">Location</span>
-    <div class="ac-wrap">
-      <input class="p-input" id="scout-location" placeholder="Start typing town..." oninput="handleAC(this.value)" onkeydown="handleACKey(event)" value="${STATE.scoutLocation||''}">
-      <div class="ac-list" id="ac-list"></div>
-    </div>
-  </div>
-  <div class="p-section">
-    <span class="p-label">Niche</span>
-    <select class="p-select" id="scout-niche">
-      <option value="">— Select niche —</option>
-      <optgroup label="Food & Drink">
-        <option value="restaurant" ${STATE.scoutNiche==='restaurant'?'selected':''}>Restaurants</option>
-        <option value="cafe" ${STATE.scoutNiche==='cafe'?'selected':''}>Cafes</option>
-        <option value="bar" ${STATE.scoutNiche==='bar'?'selected':''}>Bars & Pubs</option>
-        <option value="fast_food">Fast Food</option>
-        <option value="bakery">Bakeries</option>
-      </optgroup>
-      <optgroup label="Health & Beauty">
-        <option value="pharmacy">Pharmacies</option>
-        <option value="hairdresser">Barbers & Hair</option>
-        <option value="beauty">Beauty Salons</option>
-        <option value="dentist">Dentists</option>
-        <option value="gym">Gyms</option>
-      </optgroup>
-      <optgroup label="Trades">
-        <option value="car_repair">Car Repair</option>
-        <option value="clothes">Clothing</option>
-        <option value="convenience">Convenience</option>
-      </optgroup>
-    </select>
-  </div>
-  <button class="p-btn" onclick="startScout()">⬡ INITIATE SCOUT</button>`
-  :`<button class="p-btn stop" onclick="stopScout()">⬛ STOP SCOUT</button>`}
+  ${running
+    ?`<div class="running-badge active"><div class="rb-dot"></div>SCOUT SCANNING — ${STATE.scoutLocation||''} / ${STATE.scoutNiche||''}</div>
+      <div class="pipeline-note" style="margin-bottom:12px">Leads with emails are instantly passed to FORGE for building.</div>
+      <button class="p-btn stop" onclick="STATE.scoutStopped=true;STATE.pipelineStopped=true">⬛ STOP SCOUT</button>`
+    :`<div class="pipeline-note">Use the machine switch to activate SCOUT. It will run automatically as part of the full pipeline.</div>`
+  }
   <div class="p-progress" id="prog-SCOUT"><div class="p-progress-label" id="progl-SCOUT"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SCOUT"></div></div></div>
   <div class="p-log" id="log-SCOUT"></div>
   <div class="p-table-wrap">
@@ -1215,15 +1298,12 @@ function renderForgePanel(){
     <div class="p-stat"><span class="v" style="color:var(--green)">${q.filter(i=>i.status==='saved').length}</span><span class="l">BUILT</span></div>
     <div class="p-stat"><span class="v" style="color:var(--red)">${q.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div>
   </div>
-  ${STATE.forgeRunning?`<div class="running-badge active"><div class="rb-dot"></div>FORGE BUILDING SITES</div>`:''}
-  <div class="pipeline-note">FORGE pulls from SCOUT leads and builds sites automatically.</div>
-  ${!STATE.forgeRunning?`
-  <div class="p-section">
-    <span class="p-label">Max Builds</span>
-    <select class="p-select" id="forge-max"><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="999">All</option></select>
-  </div>
-  <button class="p-btn" onclick="startForge()">🔴 INITIATE FORGE</button>`
-  :`<button class="p-btn stop" onclick="STATE.forgeStopped=true">⬛ STOP FORGE</button>`}
+  ${STATE.forgeRunning
+    ?`<div class="running-badge active"><div class="rb-dot"></div>FORGE BUILDING — ${STATE.forgeQueue.filter(i=>i.status==='building').length} active</div>
+      <div class="pipeline-note" style="margin-bottom:12px">Building sites in parallel with SCOUT scanning. Completed builds go straight to LAUNCH.</div>
+      <button class="p-btn stop" onclick="STATE.forgeStopped=true">⬛ STOP FORGE</button>`
+    :`<div class="pipeline-note">FORGE activates automatically when SCOUT finds leads with emails. No manual input needed.</div>`
+  }
   <div class="p-progress" id="prog-FORGE"><div class="p-progress-label" id="progl-FORGE"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-FORGE"></div></div></div>
   <div class="p-log" id="log-FORGE"></div>
   <div class="p-table-wrap">
@@ -1247,10 +1327,12 @@ function renderLaunchPanel(){
     <div class="p-stat"><span class="v" style="color:var(--green)">${q.filter(i=>i.status==='live').length}</span><span class="l">LIVE</span></div>
     <div class="p-stat"><span class="v" style="color:var(--red)">${q.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div>
   </div>
-  ${STATE.launchRunning?`<div class="running-badge active"><div class="rb-dot"></div>LAUNCH DEPLOYING SITES</div>`:''}
-  <div class="pipeline-note">LAUNCH pulls built sites from forge_output and deploys them to GitHub Pages automatically.</div>
-  ${!STATE.launchRunning?`<button class="p-btn" onclick="startLaunch()">🟢 INITIATE LAUNCH</button>`
-  :`<button class="p-btn stop" onclick="STATE.launchStopped=true">⬛ STOP LAUNCH</button>`}
+  ${STATE.launchRunning
+    ?`<div class="running-badge active"><div class="rb-dot"></div>LAUNCH DEPLOYING TO GITHUB PAGES</div>
+      <div class="pipeline-note" style="margin-bottom:12px">Deploying sites as FORGE completes them. Each site gets its own GitHub Pages URL.</div>
+      <button class="p-btn stop" onclick="STATE.launchStopped=true">⬛ STOP LAUNCH</button>`
+    :`<div class="pipeline-note">LAUNCH activates automatically when FORGE completes a site. Deploys straight to GitHub Pages with no manual input.</div>`
+  }
   <div class="p-progress" id="prog-LAUNCH"><div class="p-progress-label" id="progl-LAUNCH"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-LAUNCH"></div></div></div>
   <div class="p-log" id="log-LAUNCH"></div>
   <div class="p-table-wrap">
@@ -1274,10 +1356,12 @@ function renderScannerPanel(){
     <div class="p-stat"><span class="v" style="color:var(--red)">${q.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div>
     <div class="p-stat"><span class="v" style="color:var(--amber)">${q.filter(i=>i.status==='requeued').length}</span><span class="l">REQUEUED</span></div>
   </div>
-  ${STATE.scannerRunning?`<div class="running-badge active"><div class="rb-dot"></div>SCANNER CHECKING SITES</div>`:''}
-  <div class="pipeline-note">SCANNER checks every live site before emails are sent. Approved sites go to DISPATCH queue automatically.</div>
-  ${!STATE.scannerRunning?`<button class="p-btn" onclick="startScanner()">🖤 INITIATE SCANNER</button>`
-  :`<button class="p-btn stop" onclick="STATE.scannerStopped=true">⬛ STOP SCANNER</button>`}
+  ${STATE.scannerRunning
+    ?`<div class="running-badge active"><div class="rb-dot"></div>SCANNER CHECKING QUALITY</div>
+      <div class="pipeline-note" style="margin-bottom:12px">Checking each live site before it goes to DISPATCH. Approved sites enter the email queue instantly.</div>
+      <button class="p-btn stop" onclick="STATE.scannerStopped=true">⬛ STOP SCANNER</button>`
+    :`<div class="pipeline-note">SCANNER activates automatically when LAUNCH deploys a site. No manual input needed.</div>`
+  }
   <div class="p-progress" id="prog-SCANNER"><div class="p-progress-label" id="progl-SCANNER"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SCANNER"></div></div></div>
   <div class="p-log" id="log-SCANNER"></div>
   <div class="p-table-wrap">
@@ -1326,8 +1410,10 @@ function renderDispatchPanel(){
     <div class="delay-row"><span>Send Delay</span><span id="delay-label">${STATE.sendDelay||30}s between emails</span></div>
     <input type="range" id="delay-slider" min="10" max="120" value="${STATE.sendDelay||30}" oninput="STATE.sendDelay=parseInt(this.value);document.getElementById('delay-label').textContent=this.value+'s between emails'">
   </div>
-  ${!STATE.dispatchRunning?`<button class="p-btn" style="margin-top:12px" onclick="startDispatch()">🟠 INITIATE DISPATCH</button>`
-  :`<button class="p-btn stop" style="margin-top:12px" onclick="STATE.dispatchStopped=true">⬛ STOP DISPATCH</button>`}
+  ${STATE.dispatchRunning
+    ?`<button class="p-btn stop" style="margin-top:12px" onclick="STATE.dispatchStopped=true">⬛ STOP DISPATCH</button>`
+    :`<div class="pipeline-note" style="margin-top:12px">DISPATCH activates automatically when SCANNER approves a site. Emails fire with the configured delay.</div>`
+  }
   <div class="p-progress" id="prog-DISPATCH"><div class="p-progress-label" id="progl-DISPATCH"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-DISPATCH"></div></div></div>
   <div class="p-log" id="log-DISPATCH"></div>
   <div class="p-table-wrap">
@@ -1350,10 +1436,12 @@ function renderSentinelPanel(){
     <div class="p-stat"><span class="v" style="color:var(--blue)">1</span><span class="l">DOMAINS</span></div>
     <div class="p-stat"><span class="v" style="color:var(--green)">9.8</span><span class="l">HEALTH</span></div>
   </div>
-  ${STATE.sentinelRunning?`<div class="running-badge active"><div class="rb-dot"></div>SENTINEL SEARCHING EMAILS</div>`:''}
-  <div class="pipeline-note">SENTINEL searches 6 sources for emails of leads SCOUT couldn't find.</div>
-  ${!STATE.sentinelRunning?`<button class="p-btn" onclick="startSentinel()">💎 INITIATE SENTINEL</button>`
-  :`<button class="p-btn stop" onclick="STATE.sentinelStopped=true">⬛ STOP SENTINEL</button>`}
+  ${STATE.sentinelRunning
+    ?`<div class="running-badge active"><div class="rb-dot"></div>SENTINEL DEEP SEARCHING</div>
+      <div class="pipeline-note" style="margin-bottom:12px">Searching 6 sources for emails SCOUT couldn't find.</div>
+      <button class="p-btn stop" onclick="STATE.sentinelStopped=true">⬛ STOP SENTINEL</button>`
+    :`<div class="pipeline-note">SENTINEL runs automatically after SCOUT to recover emails from binned leads. Uses 6 search sources.</div>`
+  }
   <div class="p-progress" id="prog-SENTINEL"><div class="p-progress-label" id="progl-SENTINEL"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SENTINEL"></div></div></div>
   <div class="p-log" id="log-SENTINEL"></div>
   <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:8px">DOMAIN HEALTH</div>
