@@ -1733,9 +1733,10 @@ function getWorkerUrl(){return STATE.workerUrl||localStorage.getItem('galaxy_wor
 async function workerFetch(action,body=null){
   const base=getWorkerUrl();
   if(!base){throw new Error('No Worker URL configured — open DISPATCH panel and set it')}
-  const opts={method:body?'POST':'GET',headers:{'Content-Type':'application/json','X-Galaxy-Action':action}};
-  if(body)opts.body=JSON.stringify(body);
-  const r=await fetch(base,opts);
+  const sep=base.includes('?')?'&':'?';
+  const url=`${base}${sep}action=${encodeURIComponent(action)}`;
+  const opts=body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{method:'GET'};
+  const r=await fetch(url,opts);
   return r.json();
 }
 
