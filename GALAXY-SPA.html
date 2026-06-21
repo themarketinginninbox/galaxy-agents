@@ -871,37 +871,35 @@ async function triggerParallelPipeline(lead){
 
         if(pipelineStopped)break;
 
-        // DISPATCH — send email
+        // DISPATCH — send via Cloudflare Worker
         pipelineLog(`🟠 DISPATCH: Sending to ${l.name}`,'i');
         setNodeStatus('DISPATCH','RUNNING');
         STATE.dispatchRunning=true;
         const toEmail=STATE.demoMode?STATE.demoEmail:l.email;
         if(toEmail){
           try{
-            const INSTANTLY_KEY=STATE.instantlyKey||'';
-            const emailRes=await fetch(`https://api.instantly.ai/api/v1/emails/send?api_key=${INSTANTLY_KEY}`,{
-              method:'POST',
-              headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({
-                from:'david@thewebsiteinn.co.uk',
-                from_name:'The Website Inn',
-                to:toEmail,
-                subject:`${l.name} — We Built This For You`,
-                body:`<p>We built your website. See it live here:</p><p><a href="${url}">${url}</a></p><p>We came across ${l.name} and felt you were being underrepresented online. So we built something. No obligation. No catch. Just click the link.</p><p>If it's the standard you'd expect your business to be represented at — reply to this email.</p><p>— The Website Inn<br>thewebsiteinn.co.uk</p>`
-              })
-            });
-            if(emailRes.ok){
-              STATE.sentLog.push({business_name:l.name,to:toEmail,live_url:url});
-              STATE.stats.sent++;updateBottomBar();
-              pipelineLog(`🟠 DISPATCH: Sent to ${toEmail}`,'s');
-              await sbUpdate('dispatch_queue',launchRow?.id,{status:'sent',sent_at:new Date().toISOString()});
+            // Get or create campaign
+            const campData=await workerFetch('get_campaign');
+            if(campData.ok){
+              const addData=await workerFetch('add_lead',{
+                campaign_id:campData.campaign_id,
+                email:toEmail,
+                business_name:l.name,
+                live_url:url
+              });
+              if(addData.ok){
+                STATE.sentLog.push({business_name:l.name,to:toEmail,live_url:url});
+                STATE.stats.sent++;updateBottomBar();
+                pipelineLog(`🟠 DISPATCH: Queued → ${toEmail}`,'s');
+                await sbUpdate('dispatch_queue',launchRow?.id,{status:'sent',sent_at:new Date().toISOString()});
+              } else {
+                pipelineLog(`🟠 DISPATCH: Error — ${JSON.stringify(addData.error)}`,'e');
+              }
             } else {
-              const err=await emailRes.json();
-              pipelineLog(`🟠 DISPATCH: Error — ${JSON.stringify(err)}`,'e');
+              pipelineLog(`🟠 DISPATCH: Campaign error — ${JSON.stringify(campData.error)}`,'e');
             }
           }catch(e){pipelineLog(`🟠 DISPATCH error: ${e.message}`,'e')}
         }
-        // Delay between sends
         const delay=(STATE.sendDelay||30)*1000;
         await new Promise(r=>setTimeout(r,delay));
       }
