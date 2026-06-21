@@ -329,7 +329,7 @@ const STATE = {
 
 const SUPABASE_URL='https://uklrgpommxqmdvetfxmc.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrbHJncG9tbXhxbWR2ZXRmeG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjQ2MTEsImV4cCI6MjA5NzQwMDYxMX0.xuKX88Hn4Wa_xLuLBrp7SsIsdlbiKbksRwYKwVKr5zI';
-const GITHUB_TOKEN=STATE.githubToken||'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';
+function getGithubToken(){return STATE.githubToken||localStorage.getItem('galaxy_github_token')||''}
 const GITHUB_USER='themarketinginninbox';
 
 // ═══════════════════════════════════════════
@@ -1118,6 +1118,31 @@ function clearInstantlyKey(){
   STATE.instantlyKey='';
   renderAgentPanel('DISPATCH');
 }
+function saveGithubToken(){
+  const val=document.getElementById('github-token-input')?.value?.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_github_token',val);
+  STATE.githubToken=val;
+  addLog('GALAXY','GitHub token saved','s');
+  renderAgentPanel('GALAXY');
+}
+function clearGithubToken(){
+  localStorage.removeItem('galaxy_github_token');
+  STATE.githubToken='';
+  renderAgentPanel('GALAXY');
+}
+async function testGithubToken(){
+  const token=getGithubToken();
+  if(!token){addLog('GALAXY','No GitHub token — enter it below','w');return}
+  addLog('GALAXY','Testing GitHub token...','i');
+  try{
+    const r=await fetch('https://api.github.com/user',{headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}});
+    const d=await r.json();
+    if(r.ok){addLog('GALAXY','✅ GitHub token valid — user: '+d.login,'s')}
+    else{addLog('GALAXY','❌ GitHub token invalid: '+d.message,'e')}
+  }catch(e){addLog('GALAXY','❌ GitHub test failed: '+e.message,'e')}
+  if(currentAgent?.id==='GALAXY')renderAgentPanel('GALAXY');
+}
 
 // Load saved keys on startup
 loadSavedKeys();
@@ -1280,6 +1305,25 @@ function renderGalaxyPanel(){
     <div class="p-stat"><span class="v" style="color:var(--dispatch)">${STATE.sentLog.length}</span><span class="l">SENT</span></div>
   </div>
   <div class="pipeline-note">🧠 GALAXY is the master brain. All agents are running simultaneously — navigate between them freely without losing progress.</div>
+
+  <!-- GITHUB TOKEN -->
+  ${!getGithubToken()?`
+  <div style="background:rgba(255,51,85,0.06);border:1px solid rgba(255,51,85,0.2);border-radius:6px;padding:12px;margin-bottom:12px">
+    <div style="font-size:8px;letter-spacing:2px;color:#FF3355;margin-bottom:6px">⚠️ GITHUB TOKEN REQUIRED</div>
+    <div style="font-size:8px;color:rgba(192,200,216,0.4);margin-bottom:8px">Generate at github.com → Settings → Developer settings → Personal access tokens (Classic) → repo + workflow scopes</div>
+    <input class="p-input" id="github-token-input" type="password" placeholder="ghp_...">
+    <button class="p-btn" style="margin-top:8px" onclick="saveGithubToken()">💾 SAVE GITHUB TOKEN</button>
+  </div>`:`
+  <div style="background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.15);border-radius:6px;padding:8px 12px;margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:9px;color:var(--green);letter-spacing:1px">✓ GITHUB TOKEN SAVED</span>
+      <button onclick="clearGithubToken()" style="background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:3px;color:#FF3355;font-size:8px;padding:3px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace">CLEAR</button>
+    </div>
+  </div>
+  <button onclick="testGithubToken()" style="width:100%;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:var(--green);font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;cursor:pointer;margin-bottom:12px">🔑 TEST GITHUB TOKEN</button>
+  `}
+  <div class="p-log" id="log-GALAXY"></div>
+
   <div class="p-section">
     <span class="p-label">AGENT STATUS</span>
     ${AGENTS.filter(a=>a.id!=='GALAXY').map(a=>`
@@ -1642,7 +1686,7 @@ async function startForge(){
 // LAUNCH LOGIC
 // ═══════════════════════════════════════════
 async function githubReq(endpoint,method='GET',body=null){
-  const opts={method,headers:{'Authorization':`token ${GITHUB_TOKEN}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'}};
+  const opts={method,headers:{'Authorization':`token ${getGithubToken()}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'}};
   if(body)opts.body=JSON.stringify(body);
   const r=await fetch(`https://api.github.com${endpoint}`,opts);
   return r.status===204?null:r.json();
