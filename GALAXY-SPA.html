@@ -270,10 +270,74 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 <div id="topbar">
   <div><div class="brand">🧠 GALAXY</div><span class="sub">AUTONOMOUS SALES INTELLIGENCE</span></div>
   <div id="live-badge"><div id="live-dot"></div>LIVE</div>
-  <div style="display:flex;align-items:center;gap:8px;pointer-events:all">
-    <div id="clock"></div>
-    <button onclick="openPanel(AGENTS.find(a=>a.id==='GALAXY'))" style="background:rgba(0,180,216,0.1);border:1px solid rgba(0,180,216,0.3);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;padding:5px 10px;cursor:pointer;letter-spacing:1px">⚙ SETTINGS</button>
+  <div id="clock"></div>
+</div>
+
+<!-- SETTINGS BUTTON -->
+<div id="settings-btn" ontouchstart="openSettings()" onclick="openSettings()" style="position:fixed;top:52px;right:12px;z-index:500;background:rgba(0,180,216,0.15);border:1px solid rgba(0,180,216,0.4);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;padding:6px 12px;cursor:pointer;letter-spacing:1px;user-select:none;-webkit-user-select:none;touch-action:manipulation">⚙ SETTINGS</div>
+
+<!-- SETTINGS OVERLAY -->
+<div id="settings-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(1,2,8,0.92);backdrop-filter:blur(12px);overflow-y:auto;padding:24px 20px 40px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+    <div style="font-family:'Orbitron',sans-serif;font-size:14px;font-weight:900;letter-spacing:4px;color:#00B4D8">⚙ SETTINGS</div>
+    <button onclick="document.getElementById('settings-overlay').style.display='none'" style="background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;padding:6px 14px;cursor:pointer">✕ CLOSE</button>
   </div>
+
+  <!-- GITHUB TOKEN -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:8px;letter-spacing:3px;color:rgba(192,200,216,0.4);margin-bottom:10px">🟢 GITHUB — LAUNCH AGENT</div>
+    <div id="github-status" style="font-size:9px;color:var(--green);margin-bottom:8px"></div>
+    <input id="s-github-token" type="password" placeholder="ghp_... (repo + workflow scopes)" style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveSettingGithub()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:#00FF88;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">💾 SAVE</button>
+      <button onclick="testSettingGithub()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">🔑 TEST</button>
+      <button onclick="clearSettingGithub()" style="padding:9px 14px;background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">✕</button>
+    </div>
+    <div id="github-log" style="font-size:8px;color:#00B4D8;margin-top:6px;min-height:16px"></div>
+  </div>
+
+  <div style="border-top:1px solid rgba(255,255,255,0.06);margin-bottom:20px"></div>
+
+  <!-- WORKER URL -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:8px;letter-spacing:3px;color:rgba(192,200,216,0.4);margin-bottom:10px">🟠 CLOUDFLARE WORKER — DISPATCH AGENT</div>
+    <div id="worker-status" style="font-size:9px;color:var(--green);margin-bottom:8px"></div>
+    <input id="s-worker-url" type="url" placeholder="https://dispatchbridge.YOUR-NAME.workers.dev" style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveSettingWorker()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:#00FF88;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">💾 SAVE</button>
+      <button onclick="testSettingWorker()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">🔑 TEST</button>
+      <button onclick="clearSettingWorker()" style="padding:9px 14px;background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">✕</button>
+    </div>
+    <div id="worker-log" style="font-size:8px;color:#00B4D8;margin-top:6px;min-height:16px"></div>
+  </div>
+
+  <div style="border-top:1px solid rgba(255,255,255,0.06);margin-bottom:20px"></div>
+
+  <!-- NETLIFY TOKEN -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:8px;letter-spacing:3px;color:rgba(192,200,216,0.4);margin-bottom:10px">🟢 NETLIFY — LAUNCH AGENT</div>
+    <div id="netlify-status" style="font-size:9px;color:var(--green);margin-bottom:8px"></div>
+    <input id="s-netlify-token" type="password" placeholder="nfp_..." style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveSettingNetlify()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:#00FF88;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">💾 SAVE</button>
+      <button onclick="testSettingNetlify()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">🔑 TEST</button>
+      <button onclick="clearSettingNetlify()" style="padding:9px 14px;background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">✕</button>
+    </div>
+    <div id="netlify-log" style="font-size:8px;color:#00B4D8;margin-top:6px;min-height:16px"></div>
+  </div>
+
+  <div style="border-top:1px solid rgba(255,255,255,0.06);margin-bottom:20px"></div>
+
+  <!-- INSTANTLY KEY -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:8px;letter-spacing:3px;color:rgba(192,200,216,0.4);margin-bottom:10px">🟠 INSTANTLY API KEY — DISPATCH AGENT</div>
+    <input id="s-instantly-key" type="password" placeholder="Instantly V2 API key" style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveSettingInstantly()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:#00FF88;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">💾 SAVE</button>
+      <button onclick="clearSettingInstantly()" style="padding:9px 14px;background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">✕</button>
+    </div>
+  </div>
+
 </div>
 
 <!-- MACHINE SWITCH -->
@@ -326,7 +390,7 @@ const STATE = {
   scannerRunning: false, dispatchRunning: false, sentinelRunning: false,
   scoutStopped: false, forgeStopped: false, launchStopped: false,
   scannerStopped: false, dispatchStopped: false, sentinelStopped: false,
-  demoMode: false, demoEmail: '', instantlyKey: '', workerUrl: '',
+  demoMode: false, demoEmail: '', instantlyKey: '', workerUrl: '', netlifyToken: '', netlifyToken: '', githubToken: '',
   logs: { SCOUT:[], FORGE:[], LAUNCH:[], SCANNER:[], DISPATCH:[], SENTINEL:[], SAM:[] },
   stats: { leads:0, built:0, live:0, sent:0 }
 };
@@ -335,6 +399,7 @@ const SUPABASE_URL='https://uklrgpommxqmdvetfxmc.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrbHJncG9tbXhxbWR2ZXRmeG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjQ2MTEsImV4cCI6MjA5NzQwMDYxMX0.xuKX88Hn4Wa_xLuLBrp7SsIsdlbiKbksRwYKwVKr5zI';
 function getGithubToken(){return STATE.githubToken||localStorage.getItem('galaxy_github_token')||''}
 const GITHUB_USER='themarketinginninbox';
+function getNetlifyToken(){return STATE.netlifyToken||localStorage.getItem('galaxy_netlify_token')||''}
 
 // ═══════════════════════════════════════════
 // AGENT CONFIG
@@ -813,6 +878,71 @@ async function confirmActivation(){
 }
 
 // ═══════════════════════════════════════════
+// NETLIFY ZIP HELPER
+// ═══════════════════════════════════════════
+async function createZip(filename, content){
+  // Create a minimal valid ZIP file containing one file
+  const encoder=new TextEncoder();
+  const fileData=encoder.encode(content);
+  const fileNameData=encoder.encode(filename);
+  
+  // Local file header
+  const localHeader=new Uint8Array([
+    0x50,0x4B,0x03,0x04, // signature
+    0x14,0x00,           // version needed
+    0x00,0x00,           // flags
+    0x00,0x00,           // compression (stored)
+    0x00,0x00,0x00,0x00, // mod time/date
+    0x00,0x00,0x00,0x00, // crc32 (0 for stored)
+    ...new Uint8Array(new Uint32Array([fileData.length]).buffer), // compressed size
+    ...new Uint8Array(new Uint32Array([fileData.length]).buffer), // uncompressed size
+    fileNameData.length&0xFF,(fileNameData.length>>8)&0xFF, // filename length
+    0x00,0x00            // extra field length
+  ]);
+  
+  const offset=localHeader.length+fileNameData.length;
+  
+  // Central directory
+  const centralDir=new Uint8Array([
+    0x50,0x4B,0x01,0x02, // signature
+    0x14,0x00,0x14,0x00, // versions
+    0x00,0x00,0x00,0x00, // flags, compression
+    0x00,0x00,0x00,0x00, // mod time/date
+    0x00,0x00,0x00,0x00, // crc32
+    ...new Uint8Array(new Uint32Array([fileData.length]).buffer),
+    ...new Uint8Array(new Uint32Array([fileData.length]).buffer),
+    fileNameData.length&0xFF,(fileNameData.length>>8)&0xFF,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    ...new Uint8Array(new Uint32Array([0]).buffer) // offset
+  ]);
+  
+  const centralDirSize=centralDir.length+fileNameData.length;
+  const centralDirOffset=offset+fileData.length;
+  
+  // End of central directory
+  const endRecord=new Uint8Array([
+    0x50,0x4B,0x05,0x06, // signature
+    0x00,0x00,0x00,0x00, // disk numbers
+    0x01,0x00,0x01,0x00, // entry counts
+    ...new Uint8Array(new Uint32Array([centralDirSize]).buffer),
+    ...new Uint8Array(new Uint32Array([centralDirOffset]).buffer),
+    0x00,0x00            // comment length
+  ]);
+  
+  // Combine all parts
+  const total=new Uint8Array(localHeader.length+fileNameData.length+fileData.length+centralDir.length+fileNameData.length+endRecord.length);
+  let pos=0;
+  total.set(localHeader,pos);pos+=localHeader.length;
+  total.set(fileNameData,pos);pos+=fileNameData.length;
+  total.set(fileData,pos);pos+=fileData.length;
+  total.set(centralDir,pos);pos+=centralDir.length;
+  total.set(fileNameData,pos);pos+=fileNameData.length;
+  total.set(endRecord,pos);
+  
+  return total.buffer;
+}
+
+// ═══════════════════════════════════════════
 // PARALLEL PIPELINE — fires as SCOUT finds leads
 // ═══════════════════════════════════════════
 const parallelQueue=[];
@@ -826,11 +956,18 @@ async function triggerParallelPipeline(lead){
   while(parallelQueue.length>0&&!pipelineStopped){
     const l=parallelQueue.shift();
     try{
-      // FORGE — build site for this lead
-      pipelineLog(`🔴 FORGE: Building ${l.name}`,'i');
+      // FORGE — AI-powered site generation
+      pipelineLog(`🔴 FORGE: AI building ${l.name}...`,'i');
       setNodeStatus('FORGE','RUNNING');
       STATE.forgeRunning=true;
-      const html=buildSiteHTML(l);
+      let html='';
+      try{
+        html=await buildSiteWithAI(l);
+        pipelineLog(`🔴 FORGE: AI site generated for ${l.name}`,'s');
+      }catch(e){
+        pipelineLog(`🔴 FORGE: AI failed (${e.message}) — using template`,'w');
+        html=buildSiteHTML(l);
+      }
       const forgeRow=await sbInsert('forge_output',{lead_id:l.id,business_name:l.name,html,status:'ready'});
       STATE.forgeQueue.push({...l,status:'saved',forge_id:forgeRow?.id});
       STATE.stats.built++;updateBottomBar();
@@ -838,53 +975,27 @@ async function triggerParallelPipeline(lead){
 
       if(pipelineStopped)break;
 
-      // LAUNCH — deploy this site
-      pipelineLog(`🟢 LAUNCH: Deploying ${l.name}`,'i');
+      // LAUNCH — deploy to Netlify
+      pipelineLog(`🟢 LAUNCH: Deploying ${l.name} to Netlify...`,'i');
       setNodeStatus('LAUNCH','RUNNING');
       STATE.launchRunning=true;
-      const repo=`galaxy-${slugify(l.name)}`;
-      const url=`https://${GITHUB_USER}.github.io/${repo}/`;
+      if(!getNetlifyToken()){pipelineLog('🟢 LAUNCH: No Netlify token — open Settings','e');break;}
 
-      // Step 1: Create repo — log result explicitly
-      const repoRes=await githubReq('/user/repos','POST',{name:repo,private:false,auto_init:false,description:`GALAXY — ${l.name}`});
-      if(repoRes?.id){
-        pipelineLog(`🟢 LAUNCH: Repo created — ${repo}`,'s');
-      } else if(repoRes?.errors?.[0]?.message?.includes('already exists')||repoRes?.message?.includes('already exists')){
-        pipelineLog(`🟢 LAUNCH: Repo exists — reusing ${repo}`,'i');
-      } else {
-        pipelineLog(`🟢 LAUNCH: Repo error — ${JSON.stringify(repoRes?.message||repoRes?.errors)}`,'e');
+      const siteName=`galaxy-${slugify(l.name)}-${Date.now().toString(36)}`;
+      let url='';
+      let launchRow=null;
+
+      try{
+        url=await netlifyFileDeploy(siteName,html);
+        pipelineLog(`🟢 LAUNCH: ✅ LIVE — ${url}`,'s');
+        launchRow=await sbInsert('launch_output',{forge_id:forgeRow?.id,business_name:l.name,netlify_site:siteName,live_url:url,status:'live'});
+        if(forgeRow?.id)await sbUpdate('forge_output',forgeRow.id,{status:'deployed'});
+        STATE.launchQueue.push({...l,status:'live',url});
+        STATE.stats.live++;updateBottomBar();
+      }catch(e){
+        pipelineLog(`🟢 LAUNCH: Failed — ${e.message}`,'e');
+        url='';
       }
-      await new Promise(r=>setTimeout(r,2000));
-
-      // Step 2: Push index.html
-      const encoded=btoa(unescape(encodeURIComponent(html)));
-      let sha=null;
-      try{const ex=await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`);sha=ex?.sha}catch{}
-      const pb={message:'GALAXY LAUNCH',content:encoded};if(sha)pb.sha=sha;
-      const pushRes=await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`,'PUT',pb);
-      if(pushRes?.content?.name){
-        pipelineLog(`🟢 LAUNCH: index.html pushed`,'s');
-      } else {
-        pipelineLog(`🟢 LAUNCH: Push error — ${JSON.stringify(pushRes?.message)}`,'e');
-      }
-
-      // Step 3: Enable Pages
-      await new Promise(r=>setTimeout(r,1500));
-      const pagesRes=await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch:'main',path:'/'}});
-      if(pagesRes?.url||pagesRes?.html_url){
-        pipelineLog(`🟢 LAUNCH: Pages enabled`,'s');
-      } else if(pagesRes?.message?.includes('already enabled')){
-        pipelineLog(`🟢 LAUNCH: Pages already enabled`,'i');
-      } else {
-        // Try PUT to update existing pages config
-        try{await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'PUT',{source:{branch:'main',path:'/'}})}catch{}
-      }
-
-      const launchRow=await sbInsert('launch_output',{forge_id:forgeRow?.id,business_name:l.name,github_repo:repo,live_url:url,status:'live'});
-      if(forgeRow?.id)await sbUpdate('forge_output',forgeRow.id,{status:'deployed'});
-      STATE.launchQueue.push({...l,status:'live',url});
-      STATE.stats.live++;updateBottomBar();
-      pipelineLog(`🟢 LAUNCH: Live ${l.name} → ${url}`,'s');
 
       if(pipelineStopped)break;
 
@@ -1109,6 +1220,8 @@ function loadSavedKeys(){
   if(g){STATE.githubToken=g}
   const w=localStorage.getItem('galaxy_worker_url');
   if(w){STATE.workerUrl=w}
+  const n=localStorage.getItem('galaxy_netlify_token');
+  if(n){STATE.netlifyToken=n}
 }
 function saveInstantlyKey(){
   const val=document.getElementById('instantly-key-input')?.value?.trim();
@@ -1146,6 +1259,119 @@ async function testGithubToken(){
     else{addLog('GALAXY','❌ GitHub token invalid: '+d.message,'e')}
   }catch(e){addLog('GALAXY','❌ GitHub test failed: '+e.message,'e')}
   if(currentAgent?.id==='GALAXY')renderAgentPanel('GALAXY');
+}
+
+// ═══════════════════════════════════════════
+// SETTINGS OVERLAY
+// ═══════════════════════════════════════════
+function openSettings(){
+  const overlay=document.getElementById('settings-overlay');
+  overlay.style.display='block';
+  // Populate current values
+  const gt=getGithubToken();
+  const wu=getWorkerUrl();
+  const ik=STATE.instantlyKey||'';
+  if(gt)document.getElementById('github-status').textContent='✓ Token saved';
+  if(wu){document.getElementById('worker-status').textContent='✓ '+wu;document.getElementById('s-worker-url').value=wu;}
+  if(ik)document.getElementById('s-instantly-key').value=ik;
+  const nt=getNetlifyToken();
+  if(nt){document.getElementById('netlify-status').textContent='✓ Token saved';document.getElementById('s-netlify-token').value=nt;}
+}
+
+function saveSettingGithub(){
+  const val=document.getElementById('s-github-token').value.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_github_token',val);
+  STATE.githubToken=val;
+  document.getElementById('github-status').textContent='✓ Token saved';
+  document.getElementById('github-log').textContent='Saved — tap TEST to verify';
+}
+function clearSettingGithub(){
+  localStorage.removeItem('galaxy_github_token');
+  STATE.githubToken='';
+  document.getElementById('github-status').textContent='';
+  document.getElementById('s-github-token').value='';
+  document.getElementById('github-log').textContent='Cleared';
+}
+async function testSettingGithub(){
+  const token=getGithubToken();
+  const log=document.getElementById('github-log');
+  if(!token){log.textContent='No token saved';return}
+  log.textContent='Testing...';
+  try{
+    const r=await fetch('https://api.github.com/user',{headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}});
+    const d=await r.json();
+    if(r.ok){log.style.color='#00FF88';log.textContent='✅ Valid — logged in as '+d.login;}
+    else{log.style.color='#FF3355';log.textContent='❌ Invalid: '+d.message;}
+  }catch(e){log.style.color='#FF3355';log.textContent='❌ Error: '+e.message;}
+}
+
+function saveSettingWorker(){
+  const val=document.getElementById('s-worker-url').value.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_worker_url',val);
+  STATE.workerUrl=val;
+  document.getElementById('worker-status').textContent='✓ '+val;
+  document.getElementById('worker-log').textContent='Saved — tap TEST to verify';
+}
+function clearSettingWorker(){
+  localStorage.removeItem('galaxy_worker_url');
+  STATE.workerUrl='';
+  document.getElementById('worker-status').textContent='';
+  document.getElementById('s-worker-url').value='';
+  document.getElementById('worker-log').textContent='Cleared';
+}
+async function testSettingWorker(){
+  const log=document.getElementById('worker-log');
+  log.textContent='Testing...';
+  try{
+    const d=await workerFetch('test_key');
+    if(d.ok){log.style.color='#00FF88';log.textContent='✅ Worker connected — Instantly key valid';}
+    else{log.style.color='#FF3355';log.textContent='❌ '+JSON.stringify(d.error);}
+  }catch(e){log.style.color='#FF3355';log.textContent='❌ '+e.message;}
+}
+
+function saveSettingNetlify(){
+  const val=document.getElementById('s-netlify-token').value.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_netlify_token',val);
+  STATE.netlifyToken=val;
+  document.getElementById('netlify-status').textContent='✓ Token saved';
+  document.getElementById('netlify-log').textContent='Saved — tap TEST to verify';
+}
+function clearSettingNetlify(){
+  localStorage.removeItem('galaxy_netlify_token');
+  STATE.netlifyToken='';
+  document.getElementById('netlify-status').textContent='';
+  document.getElementById('s-netlify-token').value='';
+  document.getElementById('netlify-log').textContent='Cleared';
+}
+async function testSettingNetlify(){
+  const token=getNetlifyToken();
+  const log=document.getElementById('netlify-log');
+  if(!token){log.textContent='No token saved';return}
+  log.textContent='Testing...';
+  try{
+    const r=await fetch('https://api.netlify.com/api/v1/user',{
+      headers:{'Authorization':`Bearer ${token}`}
+    });
+    const d=await r.json();
+    if(r.ok){log.style.color='#00FF88';log.textContent='✅ Valid — '+d.email;}
+    else{log.style.color='#FF3355';log.textContent='❌ Invalid: '+d.message;}
+  }catch(e){log.style.color='#FF3355';log.textContent='❌ Error: '+e.message;}
+}
+
+function saveSettingInstantly(){
+  const val=document.getElementById('s-instantly-key').value.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_instantly_key',val);
+  STATE.instantlyKey=val;
+  document.getElementById('worker-log').textContent='Instantly key saved';
+}
+function clearSettingInstantly(){
+  localStorage.removeItem('galaxy_instantly_key');
+  STATE.instantlyKey='';
+  document.getElementById('s-instantly-key').value='';
 }
 
 // Load saved keys on startup
@@ -1641,6 +1867,45 @@ function stopScout(){STATE.scoutStopped=true;addLog('SCOUT','Stop requested','w'
 // ═══════════════════════════════════════════
 const NICHE_CFG={restaurant:{tagline:'Fine Dining · Curated Experiences · Seasonal Menu',color:'#C9A84C'},cafe:{tagline:'Artisan Coffee · Fresh Food · Warm Atmosphere',color:'#A0784C'},bar:{tagline:'Craft Drinks · Great Vibes · Memorable Nights',color:'#C9A84C'},default:{tagline:'Quality Service · Local Business · Trusted by the Community',color:'#C9A84C'}};
 
+// ═══════════════════════════════════════════
+// FORGE — AI SITE GENERATION via Claude API
+// ═══════════════════════════════════════════
+async function buildSiteWithAI(lead){
+  const niche=lead.niche||'business';
+  const prompt=`You are FORGE, an elite web designer. Build a stunning, unique, conversion-focused single-page website for this business.
+
+Business: ${lead.name}
+Type: ${niche}
+Location: ${lead.location||'UK'}
+Phone: ${lead.phone||''}
+Address: ${lead.address||''}
+
+REQUIREMENTS:
+- Full HTML document, self-contained, no external dependencies except Google Fonts
+- Dark, premium aesthetic — deep blacks, one accent colour that fits the niche
+- Sections: hero with bold headline, about, services/menu hint, contact/reserve CTA
+- Mobile responsive
+- Use the business name, location, and phone number naturally in the copy
+- Write genuine, compelling copy — not generic filler
+- Make it feel like a £2,000 bespoke website
+- Return ONLY the HTML, nothing else, no markdown, no explanation`;
+
+  const response=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens:4000,
+      messages:[{role:'user',content:prompt}]
+    })
+  });
+  const data=await response.json();
+  const html=data.content?.[0]?.text||'';
+  if(!html||html.length<500){throw new Error('AI returned empty or invalid HTML')}
+  return html;
+}
+
+// Fallback template if AI fails
 function buildSiteHTML(lead){
   const cfg=NICHE_CFG[lead.niche]||NICHE_CFG.default;
   const year=(new Date().getFullYear()-Math.floor(Math.random()*8+2)).toString();
@@ -1651,7 +1916,7 @@ async function startForge(){
   const max=parseInt(document.getElementById('forge-max')?.value||10);
   STATE.forgeRunning=true;STATE.forgeStopped=false;
   setNodeStatus('FORGE','RUNNING');
-  addLog('FORGE',`Forge started — max ${max} sites`,'s');
+  addLog('FORGE',`Forge started — AI mode — max ${max} sites`,'s');
   if(currentAgent?.id==='FORGE')renderAgentPanel('FORGE');
 
   try{
@@ -1663,20 +1928,27 @@ async function startForge(){
     for(let i=0;i<STATE.forgeQueue.length;i++){
       if(STATE.forgeStopped)break;
       const item=STATE.forgeQueue[i];
-      pBar('FORGE',Math.round((i+1)/STATE.forgeQueue.length*100),`Building ${i+1}/${STATE.forgeQueue.length}`);
+      pBar('FORGE',Math.round((i+1)/STATE.forgeQueue.length*100),`Building ${i+1}/${STATE.forgeQueue.length} — ${item.name}`);
       item.status='building';
       if(currentAgent?.id==='FORGE')renderAgentPanel('FORGE');
       try{
-        const html=buildSiteHTML(item);
+        addLog('FORGE',`🤖 AI generating site for ${item.name}...`,'i');
+        let html;
+        try{
+          html=await buildSiteWithAI(item);
+          addLog('FORGE',`✅ AI built: ${item.name}`,'s');
+        }catch(aiErr){
+          addLog('FORGE',`⚠️ AI failed (${aiErr.message}) — using template`,'w');
+          html=buildSiteHTML(item);
+        }
         const saved=await sbInsert('forge_output',{lead_id:item.id,business_name:item.name,html,status:'ready'});
         item.forge_id=saved?.id;
+        item.html=html;
         item.status='saved';
         STATE.stats.built++;
         updateBottomBar();
-        addLog('FORGE',`Built: ${item.name}`,'s');
-      }catch(e){item.status='failed';addLog('FORGE',`Failed: ${item.name}`,'e')}
+      }catch(e){item.status='failed';addLog('FORGE',`Failed: ${item.name} — ${e.message}`,'e')}
       if(currentAgent?.id==='FORGE')renderAgentPanel('FORGE');
-      await new Promise(r=>setTimeout(r,200));
     }
     addLog('FORGE',`Done. ${STATE.forgeQueue.filter(i=>i.status==='saved').length} sites built`,'s');
   }catch(e){addLog('FORGE',`Error: ${e.message}`,'e')}
@@ -1687,21 +1959,114 @@ async function startForge(){
 }
 
 // ═══════════════════════════════════════════
-// LAUNCH LOGIC
+// LAUNCH LOGIC — Netlify API
 // ═══════════════════════════════════════════
+function getNetlifyToken(){return STATE.netlifyToken||localStorage.getItem('galaxy_netlify_token')||''}
+function slugify(n){return n.toLowerCase().replace(/[^a-z0-9\s]/g,'').trim().replace(/\s+/g,'-').slice(0,40)}
+
+// Keep githubReq for any future use
 async function githubReq(endpoint,method='GET',body=null){
   const opts={method,headers:{'Authorization':`token ${getGithubToken()}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'}};
   if(body)opts.body=JSON.stringify(body);
   const r=await fetch(`https://api.github.com${endpoint}`,opts);
   return r.status===204?null:r.json();
 }
-function slugify(n){return n.toLowerCase().replace(/[^a-z0-9\s]/g,'').trim().replace(/\s+/g,'-').slice(0,40)}
+
+async function netlifyDeploy(siteName, html){
+  const token=getNetlifyToken();
+  if(!token)throw new Error('No Netlify token — add it in Settings');
+
+  // Step 1: Create a new Netlify site
+  const siteRes=await fetch('https://api.netlify.com/api/v1/sites',{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({name:siteName,custom_domain:null})
+  });
+  const siteData=await siteRes.json();
+  if(!siteRes.ok)throw new Error(`Site create failed: ${siteData.message||JSON.stringify(siteData)}`);
+  const siteId=siteData.id;
+  const siteUrl=siteData.ssl_url||siteData.url;
+
+  // Step 2: Deploy HTML as a zip
+  const encoder=new TextEncoder();
+  const htmlBytes=encoder.encode(html);
+
+  // Create a zip containing index.html using JSZip-free approach
+  // Netlify accepts direct file deploy via files API
+  const deployRes=await fetch(`https://api.netlify.com/api/v1/sites/${siteId}/deploys`,{
+    method:'POST',
+    headers:{
+      'Authorization':`Bearer ${token}`,
+      'Content-Type':'application/zip'
+    },
+    body:await createZip(html)
+  });
+  const deployData=await deployRes.json();
+  if(!deployRes.ok)throw new Error(`Deploy failed: ${deployData.message||JSON.stringify(deployData)}`);
+
+  return siteUrl;
+}
+
+async function createZip(htmlContent){
+  // Use Netlify's file digest deploy instead — simpler, no zip needed
+  // This function won't be called — see netlifyFileDeploy below
+}
+
+async function netlifyFileDeploy(siteName, html){
+  const token=getNetlifyToken();
+  if(!token)throw new Error('No Netlify token — add it in Settings');
+
+  // Step 1: Create site
+  const siteRes=await fetch('https://api.netlify.com/api/v1/sites',{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({name:siteName})
+  });
+  const siteData=await siteRes.json();
+  if(!siteRes.ok)throw new Error(`Netlify site error: ${siteData.message||siteData.errors?.join(', ')}`);
+  const siteId=siteData.id;
+  const siteUrl=siteData.ssl_url||siteData.url||`https://${siteName}.netlify.app`;
+
+  // Step 2: Create deploy with file digest
+  const htmlBlob=new Blob([html],{type:'text/html'});
+  const hashBuffer=await crypto.subtle.digest('SHA-1',await htmlBlob.arrayBuffer());
+  const sha1=Array.from(new Uint8Array(hashBuffer)).map(b=>b.toString(16).padStart(2,'0')).join('');
+
+  const digestRes=await fetch(`https://api.netlify.com/api/v1/sites/${siteId}/deploys`,{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({files:{'index.html':sha1}})
+  });
+  const digestData=await digestRes.json();
+  if(!digestRes.ok)throw new Error(`Deploy digest error: ${digestData.message}`);
+
+  const deployId=digestData.id;
+  const required=digestData.required||[];
+
+  // Step 3: Upload file if required
+  if(required.length>0){
+    const uploadRes=await fetch(`https://api.netlify.com/api/v1/deploys/${deployId}/files/index.html`,{
+      method:'PUT',
+      headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/octet-stream'},
+      body:htmlBlob
+    });
+    if(!uploadRes.ok){const e=await uploadRes.json();throw new Error(`Upload error: ${e.message}`)}
+  }
+
+  return siteUrl;
+}
 
 async function startLaunch(){
   STATE.launchRunning=true;STATE.launchStopped=false;
   setNodeStatus('LAUNCH','RUNNING');
-  addLog('LAUNCH','Launch started — pulling from forge_output','s');
+  addLog('LAUNCH','Launch started — Netlify deploy','s');
   if(currentAgent?.id==='LAUNCH')renderAgentPanel('LAUNCH');
+
+  const netlifyToken=getNetlifyToken();
+  if(!netlifyToken){
+    addLog('LAUNCH','❌ No Netlify token — open Settings and add it','e');
+    STATE.launchRunning=false;setNodeStatus('LAUNCH','IDLE');return;
+  }
 
   try{
     const sites=await sbGet('forge_output','status=eq.ready&order=created_at.asc&limit=10&select=*');
@@ -1717,47 +2082,25 @@ async function startLaunch(){
       if(currentAgent?.id==='LAUNCH')renderAgentPanel('LAUNCH');
 
       try{
-        const repo=`galaxy-${slugify(item.business_name)}`;
-        const url=`https://${GITHUB_USER}.github.io/${repo}/`;
-        item.repo=repo;item.url=url;
+        const siteName=`galaxy-${slugify(item.business_name)}-${Date.now().toString(36)}`;
+        addLog('LAUNCH',`Deploying ${item.business_name} to Netlify...`,'i');
+        const url=await netlifyFileDeploy(siteName,item.html);
+        item.url=url;
 
-        try{await githubReq('/user/repos','POST',{name:repo,private:false,auto_init:false})}catch{}
-        await new Promise(r=>setTimeout(r,1500));
-
-        const encoded=btoa(unescape(encodeURIComponent(item.html)));
-        let sha=null;
-        try{const ex=await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`);sha=ex?.sha}catch{}
-        const pb={message:'GALAXY LAUNCH',content:encoded};
-        if(sha)pb.sha=sha;
-        await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`,'PUT',pb);
-
-        // Wait for GitHub to register the commit before enabling Pages
-        await new Promise(r=>setTimeout(r,2000));
-
-        // Try to enable Pages — works on both 'main' and 'master'
-        let pagesOk=false;
-        for(const branch of['main','master']){
-          try{
-            const pr=await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch,path:'/'}});
-            if(pr&&!pr.message){pagesOk=true;break}
-          }catch{}
-        }
-        if(!pagesOk){
-          // Pages may already exist — try updating it
-          try{await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'PUT',{source:{branch:'main',path:'/'}})}catch{}
-        }
-
-        const saved=await sbInsert('launch_output',{forge_id:item.id,business_name:item.business_name,github_repo:repo,live_url:url,status:'live'});
+        const saved=await sbInsert('launch_output',{forge_id:item.id,business_name:item.business_name,netlify_site:siteName,live_url:url,status:'live'});
         item.launch_id=saved?.id;
         await sbUpdate('forge_output',item.id,{status:'deployed'});
         item.status='live';
         STATE.stats.live++;
         updateBottomBar();
-        addLog('LAUNCH',`Live: ${item.business_name} → ${url}`,'s');
-      }catch(e){item.status='failed';addLog('LAUNCH',`Failed: ${item.business_name} — ${e.message}`,'e')}
+        addLog('LAUNCH',`✅ Live: ${item.business_name} → ${url}`,'s');
+      }catch(e){
+        item.status='failed';
+        addLog('LAUNCH',`❌ Failed: ${item.business_name} — ${e.message}`,'e');
+      }
 
       if(currentAgent?.id==='LAUNCH')renderAgentPanel('LAUNCH');
-      await new Promise(r=>setTimeout(r,2000));
+      await new Promise(r=>setTimeout(r,1000));
     }
     addLog('LAUNCH',`Done. ${STATE.launchQueue.filter(i=>i.status==='live').length} sites live`,'s');
   }catch(e){addLog('LAUNCH',`Error: ${e.message}`,'e')}
