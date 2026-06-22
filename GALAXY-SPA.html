@@ -993,20 +993,20 @@ async function triggerParallelPipeline(lead){
 
       if(pipelineStopped)break;
 
-      // LAUNCH — deploy to Netlify
-      pipelineLog(`🟢 LAUNCH: Deploying ${l.name} to Netlify...`,'i');
+      // LAUNCH — deploy to Cloudflare Pages
+      pipelineLog(`🟢 LAUNCH: Deploying ${l.name} to Cloudflare Pages...`,'i');
       setNodeStatus('LAUNCH','RUNNING');
       STATE.launchRunning=true;
-      if(!getNetlifyToken()){pipelineLog('🟢 LAUNCH: No Netlify token — open Settings','e');break;}
+      if(!getCFToken()){pipelineLog('🟢 LAUNCH: No Cloudflare Pages token — open Settings','e');break;}
 
       const siteName=`galaxy-${slugify(l.name)}`;
       let url='';
       let launchRow=null;
 
       try{
-        url=await netlifyFileDeploy(siteName,html);
+        url=await cloudflarePagesDeploy(siteName,html);
         pipelineLog(`🟢 LAUNCH: ✅ LIVE — ${url}`,'s');
-        launchRow=await sbInsert('launch_output',{forge_id:forgeRow?.id,business_name:l.name,netlify_site:siteName,live_url:url,status:'live'});
+        launchRow=await sbInsert('launch_output',{forge_id:forgeRow?.id,business_name:l.name,cf_project:siteName,live_url:url,status:'live'});
         if(forgeRow?.id)await sbUpdate('forge_output',forgeRow.id,{status:'deployed'});
         STATE.launchQueue.push({...l,status:'live',url});
         STATE.stats.live++;updateBottomBar();
