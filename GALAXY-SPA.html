@@ -2036,49 +2036,14 @@ function getCFToken(){return STATE.cfPagesToken||localStorage.getItem('galaxy_cf
 function getCFAccountId(){return STATE.cfAccountId||localStorage.getItem('galaxy_cf_account_id')||'bd0954b330064b45050b14e6f079d5ed'}
 
 async function cloudflarePagesDeploy(siteName, html){
-  const token=getCFToken();
-  if(!token)throw new Error('No Cloudflare Pages token — add it in Settings');
-  const accountId=getCFAccountId();
-  const cacheKey=`galaxy_cf_site_${siteName}`;
-
-  // Step 1: Create or get existing project
-  let projectName=siteName;
-  const cached=localStorage.getItem(cacheKey);
-  if(cached){
-    addLog('LAUNCH',`Reusing CF Pages project: ${siteName}`,'i');
-  } else {
-    // Try to create project
-    const createRes=await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`,{
-      method:'POST',
-      headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
-      body:JSON.stringify({name:siteName,production_branch:'main'})
-    });
-    const createData=await createRes.json();
-    if(!createRes.ok&&!createData.errors?.[0]?.message?.includes('already exists')){
-      throw new Error(`CF Pages project error: ${createData.errors?.[0]?.message||JSON.stringify(createData)}`);
-    }
-    localStorage.setItem(cacheKey,'1');
-  }
-
-  // Step 2: Deploy via direct upload
-  const formData=new FormData();
-  const htmlBlob=new Blob([html],{type:'text/html'});
-  formData.append('index.html',htmlBlob,'index.html');
-
-  // Create deployment
-  const deployRes=await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/${projectName}/deployments`,{
-    method:'POST',
-    headers:{'Authorization':`Bearer ${token}`},
-    body:formData
+  // Route through Cloudflare Worker to avoid CORS
+  const d=await workerFetch('deploy_page',{
+    site_name:siteName,
+    html:html,
+    account_id:getCFAccountId()
   });
-  const deployData=await deployRes.json();
-
-  if(!deployRes.ok){
-    throw new Error(`CF Pages deploy error: ${deployData.errors?.[0]?.message||JSON.stringify(deployData)}`);
-  }
-
-  const url=`https://${projectName}.pages.dev`;
-  return url;
+  if(!d.ok)throw new Error(d.error||'Cloudflare Pages deploy failed');
+  return d.url;
 }
 
 // Keep netlifyFileDeploy as alias for backwards compatibility
