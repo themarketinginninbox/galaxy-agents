@@ -313,17 +313,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 
   <div style="border-top:1px solid rgba(255,255,255,0.06);margin-bottom:20px"></div>
 
-  <!-- NETLIFY TOKEN -->
+  <!-- CLOUDFLARE PAGES TOKEN -->
   <div style="margin-bottom:20px">
-    <div style="font-size:8px;letter-spacing:3px;color:rgba(192,200,216,0.4);margin-bottom:10px">🟢 NETLIFY — LAUNCH AGENT</div>
-    <div id="netlify-status" style="font-size:9px;color:var(--green);margin-bottom:8px"></div>
-    <input id="s-netlify-token" type="password" placeholder="nfp_..." style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
+    <div style="font-size:8px;letter-spacing:3px;color:rgba(192,200,216,0.4);margin-bottom:10px">🟢 CLOUDFLARE PAGES — LAUNCH AGENT</div>
+    <div id="cf-pages-status" style="font-size:9px;color:var(--green);margin-bottom:8px"></div>
+    <input id="s-cf-pages-token" type="password" placeholder="CF Pages API Token (cfat_...)" style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
+    <input id="s-cf-account-id" type="text" placeholder="Cloudflare Account ID" style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
     <div style="display:flex;gap:8px">
-      <button onclick="saveSettingNetlify()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:#00FF88;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">💾 SAVE</button>
-      <button onclick="testSettingNetlify()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">🔑 TEST</button>
-      <button onclick="clearSettingNetlify()" style="padding:9px 14px;background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">✕</button>
+      <button onclick="saveSettingCFPages()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:#00FF88;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">💾 SAVE</button>
+      <button onclick="testSettingCFPages()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">🔑 TEST</button>
+      <button onclick="clearSettingCFPages()" style="padding:9px 14px;background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">✕</button>
     </div>
-    <div id="netlify-log" style="font-size:8px;color:#00B4D8;margin-top:6px;min-height:16px"></div>
+    <div id="cf-pages-log" style="font-size:8px;color:#00B4D8;margin-top:6px;min-height:16px"></div>
   </div>
 
   <div style="border-top:1px solid rgba(255,255,255,0.06);margin-bottom:20px"></div>
@@ -390,7 +391,7 @@ const STATE = {
   scannerRunning: false, dispatchRunning: false, sentinelRunning: false,
   scoutStopped: false, forgeStopped: false, launchStopped: false,
   scannerStopped: false, dispatchStopped: false, sentinelStopped: false,
-  demoMode: false, demoEmail: '', instantlyKey: '', workerUrl: '', netlifyToken: '', netlifyToken: '', githubToken: '',
+  demoMode: false, demoEmail: '', instantlyKey: '', workerUrl: '', netlifyToken: '', cfPagesToken: '', cfAccountId: '', githubToken: '',
   logs: { SCOUT:[], FORGE:[], LAUNCH:[], SCANNER:[], DISPATCH:[], SENTINEL:[], SAM:[] },
   stats: { leads:0, built:0, live:0, sent:0 }
 };
@@ -1250,6 +1251,10 @@ function loadSavedKeys(){
   if(w){STATE.workerUrl=w}
   const n=localStorage.getItem('galaxy_netlify_token');
   if(n){STATE.netlifyToken=n}
+  const cf=localStorage.getItem('galaxy_cf_pages_token');
+  if(cf){STATE.cfPagesToken=cf}
+  const cfaid=localStorage.getItem('galaxy_cf_account_id');
+  if(cfaid){STATE.cfAccountId=cfaid}
 }
 function saveInstantlyKey(){
   const val=document.getElementById('instantly-key-input')?.value?.trim();
@@ -1302,8 +1307,10 @@ function openSettings(){
   if(gt)document.getElementById('github-status').textContent='✓ Token saved';
   if(wu){document.getElementById('worker-status').textContent='✓ '+wu;document.getElementById('s-worker-url').value=wu;}
   if(ik)document.getElementById('s-instantly-key').value=ik;
-  const nt=getNetlifyToken();
-  if(nt){document.getElementById('netlify-status').textContent='✓ Token saved';document.getElementById('s-netlify-token').value=nt;}
+  const cft=getCFToken();
+  const cfaid=STATE.cfAccountId||localStorage.getItem('galaxy_cf_account_id')||'';
+  if(cft){document.getElementById('cf-pages-status').textContent='✓ Token saved';document.getElementById('s-cf-pages-token').value=cft;}
+  if(cfaid){document.getElementById('s-cf-account-id').value=cfaid;}
 }
 
 function saveSettingGithub(){
@@ -1359,33 +1366,37 @@ async function testSettingWorker(){
   }catch(e){log.style.color='#FF3355';log.textContent='❌ '+e.message;}
 }
 
-function saveSettingNetlify(){
-  const val=document.getElementById('s-netlify-token').value.trim();
-  if(!val)return;
-  localStorage.setItem('galaxy_netlify_token',val);
-  STATE.netlifyToken=val;
-  document.getElementById('netlify-status').textContent='✓ Token saved';
-  document.getElementById('netlify-log').textContent='Saved — tap TEST to verify';
+function saveSettingCFPages(){
+  const token=document.getElementById('s-cf-pages-token').value.trim();
+  const accountId=document.getElementById('s-cf-account-id').value.trim();
+  if(token){localStorage.setItem('galaxy_cf_pages_token',token);STATE.cfPagesToken=token;}
+  if(accountId){localStorage.setItem('galaxy_cf_account_id',accountId);STATE.cfAccountId=accountId;}
+  document.getElementById('cf-pages-status').textContent='✓ Saved';
+  document.getElementById('cf-pages-log').textContent='Saved — tap TEST to verify';
 }
-function clearSettingNetlify(){
-  localStorage.removeItem('galaxy_netlify_token');
-  STATE.netlifyToken='';
-  document.getElementById('netlify-status').textContent='';
-  document.getElementById('s-netlify-token').value='';
-  document.getElementById('netlify-log').textContent='Cleared';
+function clearSettingCFPages(){
+  localStorage.removeItem('galaxy_cf_pages_token');
+  localStorage.removeItem('galaxy_cf_account_id');
+  STATE.cfPagesToken='';STATE.cfAccountId='';
+  document.getElementById('cf-pages-status').textContent='';
+  document.getElementById('s-cf-pages-token').value='';
+  document.getElementById('s-cf-account-id').value='';
+  document.getElementById('cf-pages-log').textContent='Cleared';
 }
-async function testSettingNetlify(){
-  const token=getNetlifyToken();
-  const log=document.getElementById('netlify-log');
+async function testSettingCFPages(){
+  const token=getCFToken();
+  const accountId=STATE.cfAccountId||localStorage.getItem('galaxy_cf_account_id')||'';
+  const log=document.getElementById('cf-pages-log');
   if(!token){log.textContent='No token saved';return}
   log.textContent='Testing...';
   try{
-    const r=await fetch('https://api.netlify.com/api/v1/user',{
-      headers:{'Authorization':`Bearer ${token}`}
-    });
+    const url=accountId
+      ?`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`
+      :`https://api.cloudflare.com/client/v4/user/tokens/verify`;
+    const r=await fetch(url,{headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}});
     const d=await r.json();
-    if(r.ok){log.style.color='#00FF88';log.textContent='✅ Valid — '+d.email;}
-    else{log.style.color='#FF3355';log.textContent='❌ Invalid: '+d.message;}
+    if(d.success){log.style.color='#00FF88';log.textContent='✅ CF Pages token valid';}
+    else{log.style.color='#FF3355';log.textContent='❌ Invalid: '+(d.errors?.[0]?.message||'Unknown error');}
   }catch(e){log.style.color='#FF3355';log.textContent='❌ Error: '+e.message;}
 }
 
@@ -2021,80 +2032,58 @@ async function createZip(htmlContent){
   // This function won't be called — see netlifyFileDeploy below
 }
 
-async function netlifyFileDeploy(siteName, html){
-  const token=getNetlifyToken();
-  if(!token)throw new Error('No Netlify token — add it in Settings');
+function getCFToken(){return STATE.cfPagesToken||localStorage.getItem('galaxy_cf_pages_token')||''}
+function getCFAccountId(){return STATE.cfAccountId||localStorage.getItem('galaxy_cf_account_id')||'bd0954b330064b45050b14e6f079d5ed'}
 
-  // Step 1: Check if site already exists — reuse it instead of creating new
-  let siteId=null, siteUrl=null;
-  const cacheKey=`galaxy_netlify_site_${siteName}`;
+async function cloudflarePagesDeploy(siteName, html){
+  const token=getCFToken();
+  if(!token)throw new Error('No Cloudflare Pages token — add it in Settings');
+  const accountId=getCFAccountId();
+  const cacheKey=`galaxy_cf_site_${siteName}`;
+
+  // Step 1: Create or get existing project
+  let projectName=siteName;
   const cached=localStorage.getItem(cacheKey);
   if(cached){
-    try{
-      const {id,url}=JSON.parse(cached);
-      siteId=id;siteUrl=url;
-      addLog('LAUNCH',`Reusing existing Netlify site: ${url}`,'i');
-    }catch{}
-  }
-
-  if(!siteId){
-    // Try to create new site
-    const siteRes=await fetch('https://api.netlify.com/api/v1/sites',{
+    addLog('LAUNCH',`Reusing CF Pages project: ${siteName}`,'i');
+  } else {
+    // Try to create project
+    const createRes=await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`,{
       method:'POST',
       headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
-      body:JSON.stringify({name:siteName})
+      body:JSON.stringify({name:siteName,production_branch:'main'})
     });
-    const siteData=await siteRes.json();
-
-    if(!siteRes.ok){
-      // If subdomain already exists — find it by listing sites
-      const listRes=await fetch(`https://api.netlify.com/api/v1/sites?filter=all&per_page=100`,{
-        headers:{'Authorization':`Bearer ${token}`}
-      });
-      const sites=await listRes.json();
-      const found=(sites||[]).find(s=>s.name===siteName||s.subdomain===siteName);
-      if(found){
-        siteId=found.id;
-        siteUrl=found.ssl_url||found.url||`https://${siteName}.netlify.app`;
-        localStorage.setItem(cacheKey,JSON.stringify({id:siteId,url:siteUrl}));
-        addLog('LAUNCH',`Found existing Netlify site: ${siteUrl}`,'i');
-      } else {
-        throw new Error(`Netlify site error: ${siteData.message||JSON.stringify(siteData)}`);
-      }
-    } else {
-      siteId=siteData.id;
-      siteUrl=siteData.ssl_url||siteData.url||`https://${siteName}.netlify.app`;
-      localStorage.setItem(cacheKey,JSON.stringify({id:siteId,url:siteUrl}));
+    const createData=await createRes.json();
+    if(!createRes.ok&&!createData.errors?.[0]?.message?.includes('already exists')){
+      throw new Error(`CF Pages project error: ${createData.errors?.[0]?.message||JSON.stringify(createData)}`);
     }
+    localStorage.setItem(cacheKey,'1');
   }
 
-  // Step 2: Create deploy with file digest
+  // Step 2: Deploy via direct upload
+  const formData=new FormData();
   const htmlBlob=new Blob([html],{type:'text/html'});
-  const hashBuffer=await crypto.subtle.digest('SHA-1',await htmlBlob.arrayBuffer());
-  const sha1=Array.from(new Uint8Array(hashBuffer)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  formData.append('index.html',htmlBlob,'index.html');
 
-  const digestRes=await fetch(`https://api.netlify.com/api/v1/sites/${siteId}/deploys`,{
+  // Create deployment
+  const deployRes=await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/${projectName}/deployments`,{
     method:'POST',
-    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
-    body:JSON.stringify({files:{'index.html':sha1}})
+    headers:{'Authorization':`Bearer ${token}`},
+    body:formData
   });
-  const digestData=await digestRes.json();
-  if(!digestRes.ok)throw new Error(`Deploy digest error: ${digestData.message}`);
+  const deployData=await deployRes.json();
 
-  const deployId=digestData.id;
-  const required=digestData.required||[];
-
-  // Step 3: Upload file if required
-  if(required.length>0){
-    const uploadRes=await fetch(`https://api.netlify.com/api/v1/deploys/${deployId}/files/index.html`,{
-      method:'PUT',
-      headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/octet-stream'},
-      body:htmlBlob
-    });
-    if(!uploadRes.ok){const e=await uploadRes.json();throw new Error(`Upload error: ${e.message}`)}
+  if(!deployRes.ok){
+    throw new Error(`CF Pages deploy error: ${deployData.errors?.[0]?.message||JSON.stringify(deployData)}`);
   }
 
-  return siteUrl;
+  const url=`https://${projectName}.pages.dev`;
+  return url;
+}
+
+// Keep netlifyFileDeploy as alias for backwards compatibility
+async function netlifyFileDeploy(siteName, html){
+  return cloudflarePagesDeploy(siteName, html);
 }
 
 async function startLaunch(){
