@@ -42,8 +42,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
   padding:10px 12px;
   font-size:8px;
   display:none;
-  pointer-events:none;
-  max-height:80px;overflow:hidden;
+  pointer-events:all;
+  max-height:200px;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:rgba(0,180,216,0.4) transparent;
 }
 #pipeline-mini-log.visible{display:block}
 .pml-line{padding:1px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
@@ -1171,9 +1171,9 @@ function updateMiniLog(msg,type='i'){
   const colors={s:'#00FF88',w:'#FFAA00',e:'#FF3355',i:'#4AB3FF'};
   const time=new Date().toTimeString().slice(0,8);
   el.innerHTML=`<div class="pml-line" style="color:${colors[type]||colors.i}">[${time}] ${msg}</div>`+el.innerHTML;
-  // Keep only last 5 lines
+  // Keep last 50 lines
   const lines=el.querySelectorAll('.pml-line');
-  if(lines.length>5)lines[lines.length-1].remove();
+  if(lines.length>50)lines[lines.length-1].remove();
 }
 
 // ═══════════════════════════════════════════
