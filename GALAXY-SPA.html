@@ -956,6 +956,13 @@ async function triggerParallelPipeline(lead){
   while(parallelQueue.length>0&&!pipelineStopped){
     const l=parallelQueue.shift();
     try{
+      // Skip if already processed
+      const existing=await sbGet('launch_output',`business_name=eq.${encodeURIComponent(l.name)}&limit=1&select=live_url`);
+      if(existing&&existing.length>0){
+        pipelineLog(`⏭️ SKIP: ${l.name} already processed — ${existing[0].live_url}`,'i');
+        continue;
+      }
+
       // FORGE — AI-powered site generation
       pipelineLog(`🔴 FORGE: AI building ${l.name}...`,'i');
       setNodeStatus('FORGE','RUNNING');
@@ -1099,18 +1106,29 @@ async function runForgeForPipeline(){
   try{
     const leads=await sbGet('scout_leads',`select=*&order=created_at.desc&limit=10`);
     if(!leads.length){pipelineLog('FORGE: No leads found','w');return}
-    STATE.forgeQueue=leads.map(l=>({...l,status:'queued'}));
+
+    // Get already-processed business names from launch_output
+    const launched=await sbGet('launch_output','select=business_name');
+    const launchedNames=new Set((launched||[]).map(r=>r.business_name?.toLowerCase()));
+
+    // Filter out already-processed leads
+    const newLeads=leads.filter(l=>!launchedNames.has(l.name?.toLowerCase()));
+    if(!newLeads.length){pipelineLog('FORGE: All leads already processed — skipping','w');return}
+    pipelineLog(`FORGE: ${newLeads.length} new leads to process (${leads.length-newLeads.length} skipped)`,'i');
+
+    STATE.forgeQueue=newLeads.map(l=>({...l,status:'queued'}));
     for(let i=0;i<STATE.forgeQueue.length;i++){
       if(pipelineStopped)break;
       const item=STATE.forgeQueue[i];
       item.status='building';
       try{
-        const html=buildSiteHTML(item);
+        let html;
+        try{html=await buildSiteWithAI(item)}catch{html=buildSiteHTML(item)}
         const saved=await sbInsert('forge_output',{lead_id:item.id,business_name:item.name,html,status:'ready'});
-        item.forge_id=saved?.id;item.status='saved';
+        item.forge_id=saved?.id;item.html=html;item.status='saved';
         STATE.stats.built++;updateBottomBar();
-        pipelineLog(`FORGE: Built ${item.name}`,'i');
-      }catch(e){item.status='failed'}
+        pipelineLog(`FORGE: Built ${item.name}`,'s');
+      }catch(e){item.status='failed';pipelineLog(`FORGE: Failed ${item.name} — ${e.message}`,'e')}
       await new Promise(r=>setTimeout(r,200));
     }
     setNodeStatus('FORGE','DONE');
