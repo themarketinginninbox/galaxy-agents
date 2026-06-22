@@ -274,7 +274,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 </div>
 
 <!-- SETTINGS BUTTON -->
-<div id="settings-btn" ontouchstart="openSettings()" onclick="openSettings()" style="position:fixed;bottom:90px;right:12px;z-index:500;background:rgba(0,180,216,0.15);border:1px solid rgba(0,180,216,0.4);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;padding:6px 12px;cursor:pointer;letter-spacing:1px;user-select:none;-webkit-user-select:none;touch-action:manipulation">⚙ SETTINGS</div>
+<div id="settings-btn" ontouchstart="openSettings()" onclick="openSettings()" style="position:fixed;bottom:70px;right:12px;z-index:500;background:rgba(0,180,216,0.12);border:1px solid rgba(0,180,216,0.35);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;padding:5px 10px;cursor:pointer;letter-spacing:1px;user-select:none;-webkit-user-select:none;touch-action:manipulation">⚙ SETTINGS</div>
 
 <!-- SETTINGS OVERLAY -->
 <div id="settings-overlay" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(1,2,8,0.92);backdrop-filter:blur(12px);overflow-y:auto;padding:24px 20px 40px">
@@ -411,8 +411,8 @@ const AGENTS = [
   {id:'LAUNCH',gem:'🟢',gemColor:'#00FF88',role:'Worker — Netlify Deployer'},
   {id:'SCANNER',gem:'🟤',gemColor:'#CD853F',role:'Worker — Quality Gate'},
   {id:'DISPATCH',gem:'🟠',gemColor:'#FFAA00',role:'Worker — Email Engine'},
-  {id:'SENTINEL',gem:'🔵',gemColor:'#E0E8FF',role:'Mid — Inbox Health & Email Fallback'},
-  {id:'SAM',gem:'🟣',gemColor:'#9B59B6',role:'Mid — CRM & Operations'},
+  {id:'SENTINEL',gem:'🔵',gemColor:'#E0E8FF',role:'Inbox Health & Email Recovery'},
+  {id:'SAM',gem:'🟣',gemColor:'#9B59B6',role:'CRM & Sales Operations'},
 ];
 
 // Agents orbit in a ring — evenly spaced, continuously rotating
@@ -855,10 +855,10 @@ async function confirmActivation(){
   pipelineLog(`🟢 LAUNCH complete — ${STATE.launchQueue.filter(i=>i.status==='live').length} sites live`,'s');
 
   // ── STAGE 4: SCANNER ──
-  pipelineLog('🖤 SCANNER initiating...','i');
+  pipelineLog('🟤 SCANNER initiating...','i');
   await startScanner();
   if(pipelineStopped)return;
-  pipelineLog(`🖤 SCANNER complete — ${STATE.scannerQueue.filter(i=>i.status==='approved').length} approved`,'s');
+  pipelineLog(`🟤 SCANNER complete — ${STATE.scannerQueue.filter(i=>i.status==='approved').length} approved`,'s');
 
   // ── STAGE 5: DISPATCH ──
   pipelineLog('🟠 DISPATCH initiating...','i');
@@ -1000,7 +1000,7 @@ async function triggerParallelPipeline(lead){
       if(pipelineStopped)break;
 
       // SCANNER — quick check
-      pipelineLog(`🖤 SCANNER: Checking ${l.name}`,'i');
+      pipelineLog(`🟤 SCANNER: Checking ${l.name}`,'i');
       setNodeStatus('SCANNER','RUNNING');
       STATE.scannerRunning=true;
       const checks={name:html.includes(l.name)&&!html.includes('{{'),url:true,email:!!l.email,phone:!!l.phone};
@@ -1010,7 +1010,7 @@ async function triggerParallelPipeline(lead){
       if(approved){
         await sbInsert('dispatch_queue',{business_name:l.name,email:l.email,live_url:url,template_used:'Template-01',status:'ready'});
         STATE.dispatchQueue.push({business_name:l.name,email:l.email,live_url:url});
-        pipelineLog(`🖤 SCANNER: Approved ${l.name} → queue`,'s');
+        pipelineLog(`🟤 SCANNER: Approved ${l.name} → queue`,'s');
 
         if(pipelineStopped)break;
 
@@ -1782,7 +1782,7 @@ function renderSAMPanel(){
     <div class="p-stat"><span class="v" style="color:var(--gold)">0</span><span class="l">REPLIED</span></div>
     <div class="p-stat"><span class="v" style="color:var(--amber)">0</span><span class="l">CLOSED</span></div>
   </div>
-  <div class="pipeline-note">💜 SAM tracks all confirmed sends, manages the CRM, and builds the call list for warm leads. Full build coming soon.</div>
+  <div class="pipeline-note">🟣 SAM tracks all confirmed sends, manages the CRM, and builds the call list for warm leads. Full build coming soon.</div>
   <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:8px">CALL LIST — HOT LEADS</div>
   <div class="p-table-wrap">
     <div style="overflow-x:auto;max-height:200px;overflow-y:auto">
@@ -2266,91 +2266,151 @@ async function startDispatch(){
 }
 
 // ═══════════════════════════════════════════
-// SENTINEL LOGIC
 // ═══════════════════════════════════════════
+// SENTINEL LOGIC — Deep Email Recovery
+// ═══════════════════════════════════════════
+async function sentinelScrape(url){
+  // Use Worker to scrape server-side — bypasses CORS and JS rendering issues
+  try{
+    const d=await workerFetch('scrape_url',{url});
+    return d.ok?d.html:'';
+  }catch{
+    // Fallback to allorigins
+    try{const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,{signal:AbortSignal.timeout(8000)});const d=await r.json();return d.contents||''}catch{return ''}
+  }
+}
+
 async function startSentinel(){
   STATE.sentinelRunning=true;STATE.sentinelStopped=false;STATE.sentinelFound=0;
   setNodeStatus('SENTINEL','RUNNING');
-  addLog('SENTINEL','Sentinel started — deep email search','s');
+  addLog('SENTINEL','Sentinel started — recovering emails from missed leads','s');
   if(currentAgent?.id==='SENTINEL')renderAgentPanel('SENTINEL');
 
   try{
-    const binned=await sbGet('scout_leads','lead_temp=eq.BIN&order=created_at.asc&limit=25&select=*');
-    if(!binned.length){addLog('SENTINEL','Bin is empty','w');STATE.sentinelRunning=false;setNodeStatus('SENTINEL','IDLE');return}
+    // Pull COLD leads (have website but no email found) + binned STATE leads
+    const coldLeads=await sbGet('scout_leads','email_found=eq.false&order=created_at.desc&limit=30&select=*');
+    const stateLeads=STATE.binned.filter(l=>l.website&&!l.email);
+    
+    // Merge, deduplicate by name
+    const seen=new Set();
+    const allLeads=[...coldLeads,...stateLeads].filter(l=>{
+      if(seen.has(l.name))return false;
+      seen.add(l.name);
+      return true;
+    });
 
-    for(let i=0;i<binned.length;i++){
+    if(!allLeads.length){addLog('SENTINEL','No leads to recover — all have emails or no website','w');STATE.sentinelRunning=false;setNodeStatus('SENTINEL','IDLE');return}
+    addLog('SENTINEL',`Found ${allLeads.length} leads to recover`,'i');
+
+    for(let i=0;i<allLeads.length;i++){
       if(STATE.sentinelStopped)break;
-      const lead=binned[i];
-      pBar('SENTINEL',Math.round((i+1)/binned.length*100),`Searching ${i+1}/${binned.length}`);
-      addLog('SENTINEL',`Searching: ${lead.name}`,'i');
+      const lead=allLeads[i];
+      pBar('SENTINEL',Math.round((i+1)/allLeads.length*100),`${i+1}/${allLeads.length} — ${lead.name}`);
+      addLog('SENTINEL',`🔍 Hunting: ${lead.name}`,'i');
 
       let found=null;
 
-      // Source 1 — website scrape
+      // Source 1 — scrape homepage via Worker
       if(!found&&lead.website){
         try{
-          const html=await scrapeUrl(lead.website);
+          const html=await sentinelScrape(lead.website);
           const emails=extractEmails(html);
-          if(emails[0])found={email:emails[0],source:'Website'};
-          if(!found){const html2=await scrapeUrl(lead.website.replace(/\/$/,'')+'/contact');const e2=extractEmails(html2);if(e2[0])found={email:e2[0],source:'Website/Contact'}}
+          if(emails[0]){found={email:emails[0],source:'Homepage'}}
         }catch{}
       }
 
-      // Source 2 — DuckDuckGo
+      // Source 2 — scrape /contact page
+      if(!found&&lead.website){
+        try{
+          const contactUrl=lead.website.replace(/\/$/,'')+'/contact';
+          const html=await sentinelScrape(contactUrl);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'Contact page'}}
+        }catch{}
+      }
+
+      // Source 3 — scrape /about page
+      if(!found&&lead.website){
+        try{
+          const aboutUrl=lead.website.replace(/\/$/,'')+'/about';
+          const html=await sentinelScrape(aboutUrl);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'About page'}}
+        }catch{}
+      }
+
+      // Source 4 — Google search scrape via Worker
       if(!found){
         try{
-          const q=encodeURIComponent(`"${lead.name}" "${lead.location||''}" email contact`);
-          const html=await scrapeUrl(`https://api.duckduckgo.com/?q=${q}&format=json&no_html=1`);
+          const q=encodeURIComponent(`"${lead.name}" ${lead.location||''} email`);
+          const html=await sentinelScrape(`https://www.google.com/search?q=${q}`);
           const emails=extractEmails(html);
-          if(emails[0])found={email:emails[0],source:'DuckDuckGo'};
+          if(emails[0]){found={email:emails[0],source:'Google'}}
         }catch{}
       }
 
-      // Source 3 — Bing
+      // Source 5 — DuckDuckGo
       if(!found){
         try{
           const q=encodeURIComponent(`${lead.name} ${lead.location||''} contact email`);
-          const html=await scrapeUrl(`https://www.bing.com/search?q=${q}`);
+          const html=await sentinelScrape(`https://html.duckduckgo.com/html/?q=${q}`);
           const emails=extractEmails(html);
-          if(emails[0])found={email:emails[0],source:'Bing'};
+          if(emails[0]){found={email:emails[0],source:'DuckDuckGo'}}
         }catch{}
       }
 
-      // Source 4 — Companies House
+      // Source 6 — Bing
+      if(!found){
+        try{
+          const q=encodeURIComponent(`${lead.name} ${lead.location||''} email contact`);
+          const html=await sentinelScrape(`https://www.bing.com/search?q=${q}`);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'Bing'}}
+        }catch{}
+      }
+
+      // Source 7 — Yell.com (UK business directory)
       if(!found){
         try{
           const q=encodeURIComponent(lead.name);
-          const r=await fetch(`https://api.company-information.service.gov.uk/search/companies?q=${q}&items_per_page=1`,{signal:AbortSignal.timeout(5000)});
-          const d=await r.json();
-          if(d.items?.[0])addLog('SENTINEL',`Companies House: ${lead.name} registered`,'i');
+          const loc=encodeURIComponent(lead.location||'UK');
+          const html=await sentinelScrape(`https://www.yell.com/s/${q}-${loc}.html`);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'Yell.com'}}
         }catch{}
       }
 
-      // Source 5 — Yelp
+      // Source 8 — Scoot.co.uk
       if(!found){
         try{
           const q=encodeURIComponent(`${lead.name} ${lead.location||''}`);
-          const html=await scrapeUrl(`https://www.yelp.co.uk/search?find_desc=${q}&find_loc=${encodeURIComponent(lead.location||'UK')}`);
+          const html=await sentinelScrape(`https://www.scoot.co.uk/find/${q}`);
           const emails=extractEmails(html);
-          if(emails[0])found={email:emails[0],source:'Yelp'};
+          if(emails[0]){found={email:emails[0],source:'Scoot.co.uk'}}
         }catch{}
       }
 
       if(found){
         STATE.sentinelFound++;
-        addLog('SENTINEL',`Found via ${found.source}: ${lead.name} → ${found.email}`,'s');
-        await sbUpdate('scout_leads',lead.id,{email:found.email,email_found:true,lead_temp:'WARM'});
-        STATE.leads.push({...lead,email:found.email,lead_temp:'WARM'});
+        addLog('SENTINEL',`✅ Found via ${found.source}: ${lead.name} → ${found.email}`,'s');
+        if(lead.id){
+          await sbUpdate('scout_leads',lead.id,{email:found.email,email_found:true,lead_temp:'WARM'});
+        }
+        // Add to active leads for this session
+        const updatedLead={...lead,email:found.email,lead_temp:'WARM',email_found:true};
+        STATE.leads.push(updatedLead);
         STATE.stats.leads=STATE.leads.length;
+        // Remove from binned
+        STATE.binned=STATE.binned.filter(l=>l.name!==lead.name);
         updateBottomBar();
       } else {
-        addLog('SENTINEL',`No email found: ${lead.name}`,'w');
+        addLog('SENTINEL',`❌ No email: ${lead.name}`,'w');
       }
 
       if(currentAgent?.id==='SENTINEL')renderAgentPanel('SENTINEL');
-      await new Promise(r=>setTimeout(r,400));
+      await new Promise(r=>setTimeout(r,300));
     }
-    addLog('SENTINEL',`Done. ${STATE.sentinelFound} emails recovered`,'s');
+    addLog('SENTINEL',`Done. ${STATE.sentinelFound}/${allLeads.length} emails recovered`,'s');
   }catch(e){addLog('SENTINEL',`Error: ${e.message}`,'e')}
 
   STATE.sentinelRunning=false;setNodeStatus('SENTINEL','DONE');
