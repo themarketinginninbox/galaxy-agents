@@ -2038,18 +2038,34 @@ async function netlifyFileDeploy(siteName, html){
   }
 
   if(!siteId){
-    // Create new site
+    // Try to create new site
     const siteRes=await fetch('https://api.netlify.com/api/v1/sites',{
       method:'POST',
       headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
       body:JSON.stringify({name:siteName})
     });
     const siteData=await siteRes.json();
-    if(!siteRes.ok)throw new Error(`Netlify site error: ${siteData.message||JSON.stringify(siteData.errors)||JSON.stringify(siteData)}`);
-    siteId=siteData.id;
-    siteUrl=siteData.ssl_url||siteData.url||`https://${siteName}.netlify.app`;
-    // Cache it so we reuse next time
-    localStorage.setItem(cacheKey,JSON.stringify({id:siteId,url:siteUrl}));
+
+    if(!siteRes.ok){
+      // If subdomain already exists — find it by listing sites
+      const listRes=await fetch(`https://api.netlify.com/api/v1/sites?filter=all&per_page=100`,{
+        headers:{'Authorization':`Bearer ${token}`}
+      });
+      const sites=await listRes.json();
+      const found=(sites||[]).find(s=>s.name===siteName||s.subdomain===siteName);
+      if(found){
+        siteId=found.id;
+        siteUrl=found.ssl_url||found.url||`https://${siteName}.netlify.app`;
+        localStorage.setItem(cacheKey,JSON.stringify({id:siteId,url:siteUrl}));
+        addLog('LAUNCH',`Found existing Netlify site: ${siteUrl}`,'i');
+      } else {
+        throw new Error(`Netlify site error: ${siteData.message||JSON.stringify(siteData)}`);
+      }
+    } else {
+      siteId=siteData.id;
+      siteUrl=siteData.ssl_url||siteData.url||`https://${siteName}.netlify.app`;
+      localStorage.setItem(cacheKey,JSON.stringify({id:siteId,url:siteUrl}));
+    }
   }
 
   // Step 2: Create deploy with file digest
