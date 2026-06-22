@@ -1186,7 +1186,11 @@ async function runLaunchForPipeline(){
         try{const ex=await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`);sha=ex?.sha}catch{}
         const pb={message:'GALAXY LAUNCH',content:encoded};if(sha)pb.sha=sha;
         await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`,'PUT',pb);
-        try{await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch:'main',path:'/'}})}catch{}
+        // Enable Pages with logging
+        const pp=await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch:'main',path:'/'}});
+        if(pp?.url||pp?.html_url){pipelineLog(`🟢 LAUNCH: Pages enabled — ${repo}`,'s')}
+        else if(pp?.message?.includes('already')){await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'PUT',{source:{branch:'main',path:'/'}})}
+        else{pipelineLog(`🟢 LAUNCH: Pages msg — ${JSON.stringify(pp?.message)}`,'w')}
         const saved=await sbInsert('launch_output',{forge_id:item.id,business_name:item.business_name,github_repo:repo,live_url:url,status:'live'});
         item.launch_id=saved?.id;
         await sbUpdate('forge_output',item.id,{status:'deployed'});
@@ -2514,10 +2518,23 @@ async function githubPagesDeploy(siteName, html){
   const pushRes=await githubReq(`/repos/${GITHUB_USER}/${siteName}/contents/index.html`,'PUT',pb);
   if(!pushRes?.content&&!sha)throw new Error('Failed to push index.html — check GitHub token');
 
-  // Enable Pages
-  await new Promise(r=>setTimeout(r,1500));
-  try{await githubReq(`/repos/${GITHUB_USER}/${siteName}/pages`,'POST',{source:{branch:'main',path:'/'}})}catch{}
-  try{await githubReq(`/repos/${GITHUB_USER}/${siteName}/pages`,'PUT',{source:{branch:'main',path:'/'}})}catch{}
+  // Enable Pages — wait for commit to register first
+  await new Promise(r=>setTimeout(r,3000));
+  
+  // Try POST first (new Pages setup)
+  const pagesPost=await githubReq(`/repos/${GITHUB_USER}/${siteName}/pages`,'POST',{source:{branch:'main',path:'/'}});
+  if(pagesPost?.url||pagesPost?.html_url){
+    addLog('LAUNCH',`Pages enabled: ${siteName}`,'s');
+  } else if(pagesPost?.message?.includes('already enabled')||pagesPost?.message?.includes('409')){
+    // Already exists — update it
+    await githubReq(`/repos/${GITHUB_USER}/${siteName}/pages`,'PUT',{source:{branch:'main',path:'/'}});
+    addLog('LAUNCH',`Pages updated: ${siteName}`,'i');
+  } else {
+    // Log whatever came back so we can debug
+    addLog('LAUNCH',`Pages response: ${JSON.stringify(pagesPost?.message||pagesPost)}`,'w');
+    // Try PUT anyway
+    try{await githubReq(`/repos/${GITHUB_USER}/${siteName}/pages`,'PUT',{source:{branch:'main',path:'/'}})}catch{}
+  }
 
   const url=`https://${GITHUB_USER}.github.io/${siteName}/`;
   localStorage.setItem(cacheKey,url);
