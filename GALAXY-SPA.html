@@ -418,7 +418,7 @@ const AGENTS = [
   {id:'GALAXY',gem:'🧠',gemColor:'#00B4D8',role:'Master Brain — Orchestrates All Agents',level:'brain'},
   {id:'SCOUT', gem:'🔵',gemColor:'#4AB3FF',role:'Worker — Lead Sourcing Engine'},
   {id:'FORGE', gem:'🔴',gemColor:'#FF3355',role:'Worker — Website Builder'},
-  {id:'LAUNCH',gem:'🟢',gemColor:'#00FF88',role:'Worker — Netlify Deployer'},
+  {id:'LAUNCH',gem:'🟢',gemColor:'#00FF88',role:'Worker — GitHub Pages Deployer'},
   {id:'SCANNER',gem:'🟤',gemColor:'#CD853F',role:'Worker — Quality Gate'},
   {id:'DISPATCH',gem:'🟠',gemColor:'#FFAA00',role:'Worker — Email Engine'},
   {id:'SENTINEL',gem:'🔵',gemColor:'#E0E8FF',role:'Inbox Health & Email Recovery'},
@@ -2429,20 +2429,42 @@ async function createZip(htmlContent){
 function getCFToken(){return STATE.cfPagesToken||localStorage.getItem('galaxy_cf_pages_token')||''}
 function getCFAccountId(){return STATE.cfAccountId||localStorage.getItem('galaxy_cf_account_id')||'bd0954b330064b45050b14e6f079d5ed'}
 
-async function cloudflarePagesDeploy(siteName, html){
-  // Route through Cloudflare Worker to avoid CORS
-  const d=await workerFetch('deploy_page',{
-    site_name:siteName,
-    html:html,
-    account_id:getCFAccountId()
-  });
-  if(!d.ok)throw new Error(d.error||'Cloudflare Pages deploy failed');
-  return d.url;
+async function githubPagesDeploy(siteName, html){
+  const token=getGithubToken();
+  if(!token)throw new Error('No GitHub token — add it in Settings');
+  const cacheKey=`galaxy_gh_site_${siteName}`;
+
+  // Create repo if not exists
+  try{
+    await githubReq('/user/repos','POST',{name:siteName,private:false,auto_init:false,description:`GALAXY — ${siteName}`});
+    await new Promise(r=>setTimeout(r,2000));
+  }catch{}
+
+  // Push index.html
+  const encoded=btoa(unescape(encodeURIComponent(html)));
+  let sha=null;
+  try{const ex=await githubReq(`/repos/${GITHUB_USER}/${siteName}/contents/index.html`);sha=ex?.sha}catch{}
+  const pb={message:'GALAXY LAUNCH',content:encoded};
+  if(sha)pb.sha=sha;
+  const pushRes=await githubReq(`/repos/${GITHUB_USER}/${siteName}/contents/index.html`,'PUT',pb);
+  if(!pushRes?.content&&!sha)throw new Error('Failed to push index.html — check GitHub token');
+
+  // Enable Pages
+  await new Promise(r=>setTimeout(r,1500));
+  try{await githubReq(`/repos/${GITHUB_USER}/${siteName}/pages`,'POST',{source:{branch:'main',path:'/'}})}catch{}
+  try{await githubReq(`/repos/${GITHUB_USER}/${siteName}/pages`,'PUT',{source:{branch:'main',path:'/'}})}catch{}
+
+  const url=`https://${GITHUB_USER}.github.io/${siteName}/`;
+  localStorage.setItem(cacheKey,url);
+  return url;
 }
 
-// Keep netlifyFileDeploy as alias for backwards compatibility
+// Alias for pipeline compatibility
 async function netlifyFileDeploy(siteName, html){
-  return cloudflarePagesDeploy(siteName, html);
+  return githubPagesDeploy(siteName, html);
+}
+async function cloudflarePagesDeploy(siteName, html){
+  return githubPagesDeploy(siteName, html);
 }
 
 async function startLaunch(){
