@@ -1094,7 +1094,7 @@ async function runScoutForPipeline(location, niche){
         const html=await scrapeUrl(biz.website);
         email=extractEmails(html)[0]||'';
       }
-      const lead={name:biz.name||'',address:biz.address||'',phone:biz.phone||'',website:biz.website||'',email,niche,location,Lead_temp:!biz.website&&!email?'HOT':email?'WARM':'COLD',Email_found:!!email,created_at:new Date().toISOString()};
+      const lead={'Name':biz.name||'','address':biz.address||'','Phone':biz.phone||'','Website':biz.website||'','Email':email||'','Niche':niche,'Location':location,'Lead_temp':!biz.website&&!email?'HOT':email?'WARM':'COLD','Email_found':!!email,'Created_at':new Date().toISOString()};
       try{const saved=await sbInsert('scout_leads',lead);lead.id=saved?.id}catch{}
       if(email){
         STATE.leads.push(lead);
@@ -1872,7 +1872,7 @@ async function startScout(){
           email=extractEmails(html2)[0]||'';
         }
       }
-      const lead={name:biz.name||'',address:biz.address||'',phone:biz.phone||'',website:biz.website||'',email,niche,location,Lead_temp:!biz.website&&!email?'HOT':email?'WARM':'COLD',Email_found:!!email,created_at:new Date().toISOString()};
+      const lead={'Name':biz.name||'','address':biz.address||'','Phone':biz.phone||'','Website':biz.website||'','Email':email||'','Niche':niche,'Location':location,'Lead_temp':!biz.website&&!email?'HOT':email?'WARM':'COLD','Email_found':!!email,'Created_at':new Date().toISOString()};
       try{
         const saved=await sbInsert('scout_leads',lead);
         lead.id=saved?.id;
@@ -2348,7 +2348,7 @@ async function startSentinel(){
 
   try{
     // Pull COLD leads (have website but no email found) + binned STATE leads
-    const coldLeads=await sbGet('scout_leads','Email_found=eq.false&order=created_at.desc&limit=30&select=*');
+    const coldLeads=await sbGet('scout_leads','Email_found=eq.false&order=Created_at.desc&limit=30&select=*');
     const stateLeads=STATE.binned.filter(l=>l.website&&!l.email);
     
     // Merge, deduplicate by name
@@ -2454,7 +2454,7 @@ async function startSentinel(){
         STATE.sentinelFound++;
         addLog('SENTINEL',`✅ Found via ${found.source}: ${lead.name} → ${found.email}`,'s');
         if(lead.id){
-          await sbUpdate('scout_leads',lead.id,{email:found.email,Email_found:true,Lead_temp:'WARM'});
+          await sbUpdate('scout_leads',lead.id,{'Email':found.email,'Email_found':true,'Lead_temp':'WARM'});
         }
         // Add to active leads for this session
         const updatedLead={...lead,email:found.email,lead_temp:'WARM',email_found:true};
