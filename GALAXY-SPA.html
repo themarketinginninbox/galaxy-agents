@@ -981,7 +981,7 @@ async function triggerParallelPipeline(lead){
       STATE.launchRunning=true;
       if(!getNetlifyToken()){pipelineLog('🟢 LAUNCH: No Netlify token — open Settings','e');break;}
 
-      const siteName=`galaxy-${slugify(l.name)}-${Date.now().toString(36)}`;
+      const siteName=`galaxy-${slugify(l.name)}`;
       let url='';
       let launchRow=null;
 
@@ -1997,16 +1997,32 @@ async function netlifyFileDeploy(siteName, html){
   const token=getNetlifyToken();
   if(!token)throw new Error('No Netlify token — add it in Settings');
 
-  // Step 1: Create site
-  const siteRes=await fetch('https://api.netlify.com/api/v1/sites',{
-    method:'POST',
-    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
-    body:JSON.stringify({name:siteName})
-  });
-  const siteData=await siteRes.json();
-  if(!siteRes.ok)throw new Error(`Netlify site error: ${siteData.message||siteData.errors?.join(', ')}`);
-  const siteId=siteData.id;
-  const siteUrl=siteData.ssl_url||siteData.url||`https://${siteName}.netlify.app`;
+  // Step 1: Check if site already exists — reuse it instead of creating new
+  let siteId=null, siteUrl=null;
+  const cacheKey=`galaxy_netlify_site_${siteName}`;
+  const cached=localStorage.getItem(cacheKey);
+  if(cached){
+    try{
+      const {id,url}=JSON.parse(cached);
+      siteId=id;siteUrl=url;
+      addLog('LAUNCH',`Reusing existing Netlify site: ${url}`,'i');
+    }catch{}
+  }
+
+  if(!siteId){
+    // Create new site
+    const siteRes=await fetch('https://api.netlify.com/api/v1/sites',{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+      body:JSON.stringify({name:siteName})
+    });
+    const siteData=await siteRes.json();
+    if(!siteRes.ok)throw new Error(`Netlify site error: ${siteData.message||siteData.errors?.join(', ')}`);
+    siteId=siteData.id;
+    siteUrl=siteData.ssl_url||siteData.url||`https://${siteName}.netlify.app`;
+    // Cache it so we reuse next time
+    localStorage.setItem(cacheKey,JSON.stringify({id:siteId,url:siteUrl}));
+  }
 
   // Step 2: Create deploy with file digest
   const htmlBlob=new Blob([html],{type:'text/html'});
@@ -2063,7 +2079,7 @@ async function startLaunch(){
       if(currentAgent?.id==='LAUNCH')renderAgentPanel('LAUNCH');
 
       try{
-        const siteName=`galaxy-${slugify(item.business_name)}-${Date.now().toString(36)}`;
+        const siteName=`galaxy-${slugify(item.business_name)}`;
         addLog('LAUNCH',`Deploying ${item.business_name} to Netlify...`,'i');
         const url=await netlifyFileDeploy(siteName,item.html);
         item.url=url;
