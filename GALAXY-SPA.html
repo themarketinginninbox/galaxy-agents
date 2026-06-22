@@ -1316,14 +1316,29 @@ async function testGithubToken(){
 // ═══════════════════════════════════════════
 // SETTINGS OVERLAY
 // ═══════════════════════════════════════════
-function previewSite(idx){
+async function previewSite(idx){
   const item=STATE.forgeQueue[idx];
-  if(!item||!item.html)return;
+  if(!item)return;
   const modal=document.getElementById('preview-modal');
   document.getElementById('preview-title').textContent=`PREVIEW — ${item.name||item.business_name||'Site'}`;
   modal.style.display='flex';
   const frame=document.getElementById('preview-frame');
-  frame.srcdoc=item.html;
+  
+  if(item.html){
+    frame.srcdoc=item.html;
+  } else if(item.forge_id){
+    // Fetch from Supabase
+    frame.srcdoc='<p style="color:#fff;padding:20px;font-family:monospace">Loading...</p>';
+    try{
+      const rows=await sbGet('forge_output',`id=eq.${item.forge_id}&select=html`);
+      if(rows[0]?.html){frame.srcdoc=rows[0].html;}
+      else{frame.srcdoc='<p style="color:#fff;padding:20px;font-family:monospace">No HTML found</p>';}
+    }catch(e){frame.srcdoc=`<p style="color:red;padding:20px;font-family:monospace">Error: ${e.message}</p>`;}
+  } else {
+    // Generate a preview from lead data
+    const html=buildSiteHTML(item);
+    frame.srcdoc=html;
+  }
 }
 function closePreview(){
   document.getElementById('preview-modal').style.display='none';
@@ -1731,7 +1746,7 @@ function renderForgePanel(){
     <div style="overflow-x:auto;max-height:180px;overflow-y:auto">
       <table class="p-table">
         <thead><tr><th>Business</th><th>Status</th><th>Preview</th></tr></thead>
-        <tbody>${q.length?q.slice(0,15).map((i,idx)=>`<tr><td style="color:#fff">${i.name||i.business_name||'—'}</td><td><span class="badge ${i.status==='saved'?'ok':i.status==='failed'?'fail':'pend'}">${i.status?.toUpperCase()||'—'}</span></td><td>${i.status==='saved'?`<button onclick="previewSite(${idx})" style="background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:3px;color:#00B4D8;font-size:8px;padding:2px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace">👁 VIEW</button>`:'—'}</td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO BUILDS YET</div></td></tr>'}</tbody>
+        <tbody>${q.length?q.slice(0,15).map((i,idx)=>`<tr><td style="color:#fff">${i.name||i.business_name||'—'}</td><td><span class="badge ${i.status==='saved'?'ok':i.status==='failed'?'fail':'pend'}">${i.status?.toUpperCase()||'—'}</span></td><td>${i.status==='saved'?`<button ontouchstart="previewSite(${idx})" onclick="previewSite(${idx})" style="background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:3px;color:#00B4D8;font-size:8px;padding:2px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace;touch-action:manipulation">👁 VIEW</button>`:'—'}</td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO BUILDS YET</div></td></tr>'}</tbody>
       </table>
     </div>
   </div>`;
