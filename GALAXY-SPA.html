@@ -1116,18 +1116,72 @@ async function runScoutForPipeline(location, niche){
       }
       const lead={'Name':biz.name||'','address':biz.address||'','Phone':biz.phone||'','Website':biz.website||'','Email':email||'','Niche':niche,'Location':location,'Lead_temp':!biz.website&&!email?'HOT':email?'WARM':'COLD','Email_found':!!email,'Created_at':new Date().toISOString(),name:biz.name||'',phone:biz.phone||'',website:biz.website||'',email:email||'',niche:niche,location:location};
       try{const saved=await sbInsert('scout_leads',lead);lead.id=saved?.id}catch{}
-      if(email){
-        STATE.leads.push(lead);
-        // ── PARALLEL PIPELINE ── trigger FORGE immediately for this lead
-        triggerParallelPipeline(lead);
+      if(!biz.website){
+        // ── TRACK 1: No website — send to SENTINEL for email recovery
+        STATE.binned.push({...lead,track:1,attempted:'No website'});
       } else {
-        STATE.binned.push(lead);
+        // ── TRACK 2: Has website — try to get email from Google listing
+        if(email){
+          lead.track=2;
+          STATE.leads.push(lead);
+          triggerParallelPipeline(lead);
+        } else {
+          STATE.binned.push({...lead,track:2,attempted:'Has website, no email found'});
+        }
       }
       if(i%5===0)pipelineLog(`SCOUT: ${i+1}/${businesses.length} processed — ${STATE.leads.length} leads`,'i');
       await new Promise(r=>setTimeout(r,200));
     }
     STATE.stats.leads=STATE.leads.length;updateBottomBar();
     setNodeStatus('SCOUT','DONE');
+    pipelineLog(`🔵 SCOUT: Done — ${STATE.leads.length} Track 2 leads ready, ${STATE.binned.filter(b=>b.track===1).length} Track 1 sent to SENTINEL`,'s');
+    
+    // ── SENTINEL: Deep email search for Track 1 (no website) businesses
+    const track1=STATE.binned.filter(b=>b.track===1&&!b.email);
+    if(track1.length>0&&!pipelineStopped){
+      pipelineLog(`🔵 SENTINEL: Searching emails for ${track1.length} no-website businesses...`,'i');
+      setNodeStatus('SENTINEL','RUNNING');
+      STATE.sentinelFound=0;
+      for(const lead of track1){
+        if(pipelineStopped)break;
+        let found=null;
+        const searches=[
+          `https://html.duckduckgo.com/html/?q=${encodeURIComponent('"'+lead.name+'" '+lead.location+' email')}`,
+          `https://www.yell.com/s/${encodeURIComponent(lead.name)}-${encodeURIComponent(lead.location||'uk')}.html`,
+          `https://www.bing.com/search?q=${encodeURIComponent(lead.name+' '+lead.location+' contact email')}`,
+          `https://www.scoot.co.uk/find/${encodeURIComponent(lead.name+' '+lead.location)}`
+        ];
+        for(const url of searches){
+          if(found)break;
+          try{
+            const d=await workerFetch('scrape_url',{url});
+            if(d.ok){const emails=extractEmails(d.html);if(emails[0])found=emails[0];}
+          }catch{}
+          await new Promise(r=>setTimeout(r,300));
+        }
+        if(found){
+          STATE.sentinelFound++;
+          // Update lead with email and send BACK to Scout → Forge pipeline
+          lead.email=found;
+          lead.Email_found=true;
+          lead.Lead_temp='WARM';
+          if(lead.id)await sbUpdate('scout_leads',lead.id,{'Email':found,'Email_found':true,'Lead_temp':'WARM'});
+          STATE.binned=STATE.binned.filter(b=>b.name!==lead.name);
+          STATE.leads.push({...lead,email:found});
+          STATE.stats.leads=STATE.leads.length;updateBottomBar();
+          pipelineLog(`🔵 SENTINEL→SCOUT: ${lead.name} → ${found}`,'s');
+          // Send back into pipeline
+          triggerParallelPipeline({...lead,email:found});
+        } else {
+          // No email found — stays in blacklist
+          lead.blacklisted=true;
+          pipelineLog(`🔵 SENTINEL: No email found — blacklisted: ${lead.name}`,'w');
+        }
+        await new Promise(r=>setTimeout(r,400));
+      }
+      setNodeStatus('SENTINEL','DONE');
+      pipelineLog(`🔵 SENTINEL: Done — ${STATE.sentinelFound} recovered, ${track1.length-STATE.sentinelFound} blacklisted`,'s');
+    }
   }catch(e){pipelineLog(`SCOUT error: ${e.message}`,'e');setNodeStatus('SCOUT','ERROR')}
 }
 
@@ -1881,27 +1935,49 @@ function renderDispatchPanel(){
 
 // SENTINEL PANEL
 function renderSentinelPanel(){
+  const blacklist=STATE.binned.filter(b=>b.blacklisted);
+  const track1=STATE.binned.filter(b=>b.track===1&&!b.blacklisted);
+  const track2=STATE.binned.filter(b=>b.track===2&&!b.blacklisted);
+  const blacklistRows=blacklist.slice(0,20).map((b,i)=>{
+    return `<tr><td style="color:#fff">${b.name||'—'}</td><td style="font-size:8px">${b.location||'—'}</td><td><input id="bl-${i}" type="email" placeholder="email@..." style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:4px 6px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:8px;width:130px"><button onclick="addBlacklistEmail(${i},'${b.name.replace(/'/g,"\'")}','${(b.location||'').replace(/'/g,"\'")}','${(b.address||'').replace(/'/g,"\'")}','${(b.phone||'').replace(/'/g,"\'")}')" style="background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:3px;color:#00FF88;font-size:8px;padding:3px 6px;cursor:pointer;font-family:'Share Tech Mono',monospace;margin-left:4px">ADD</button></td></tr>`;
+  }).join('');
   return `
   <div class="p-stats">
-    <div class="p-stat"><span class="v" style="color:var(--sentinel)">${STATE.binned.length}</span><span class="l">IN BIN</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--sentinel)">${track1.length}</span><span class="l">TRACK 1</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--blue)">${track2.length}</span><span class="l">TRACK 2</span></div>
     <div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentinelFound||0}</span><span class="l">RECOVERED</span></div>
-    <div class="p-stat"><span class="v" style="color:var(--blue)">1</span><span class="l">DOMAINS</span></div>
-    <div class="p-stat"><span class="v" style="color:var(--green)">9.8</span><span class="l">HEALTH</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--red)">${blacklist.length}</span><span class="l">BLACKLIST</span></div>
   </div>
   ${STATE.sentinelRunning
-    ?`<div class="running-badge active"><div class="rb-dot"></div>SENTINEL DEEP SEARCHING</div>
-      <div class="pipeline-note" style="margin-bottom:12px">Searching 6 sources for emails SCOUT couldn't find.</div>
-      <button class="p-btn stop" onclick="STATE.sentinelStopped=true">⬛ STOP SENTINEL</button>`
-    :`<div class="pipeline-note">SENTINEL runs automatically after SCOUT to recover emails from binned leads. Uses 6 search sources.</div>`
+    ?'<div class="running-badge active"><div class="rb-dot"></div>SENTINEL DEEP SEARCHING</div><div class="pipeline-note" style="margin-bottom:12px">Searching for emails — found leads go back into the pipeline.</div><button class="p-btn stop" onclick="STATE.sentinelStopped=true">⬛ STOP SENTINEL</button>'
+    :'<div class="pipeline-note">SENTINEL auto-runs after SCOUT. Track 1 (no website) leads recovered here re-enter the pipeline. Leads with no findable email go to BLACKLIST for manual recovery.</div>'
   }
   <div class="p-progress" id="prog-SENTINEL"><div class="p-progress-label" id="progl-SENTINEL"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SENTINEL"></div></div></div>
   <div class="p-log" id="log-SENTINEL"></div>
-  <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:8px">DOMAIN HEALTH</div>
-  ${[{n:'thewebsiteinn.co.uk',s:9.8,c:'var(--green)'},{n:'thewebsiteinn.online',s:0,c:'var(--blue)'},{n:'thewebsiteinn.space',s:0,c:'var(--blue)'},{n:'thewebsiteinn.xyz',s:0,c:'var(--blue)'}].map(d=>`
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(1,2,8,0.4);border:1px solid rgba(255,255,255,0.05);border-radius:4px;margin-bottom:6px;font-size:9px">
-    <span>${d.n}</span>
-    <span style="color:${d.c};font-family:'Orbitron',sans-serif">${d.s>0?d.s:'WARMING'}</span>
-  </div>`).join('')}`;
+  <div class="p-table-wrap" style="margin-top:12px">
+    <div class="p-table-head" style="color:#FF3355">⛔ BLACKLIST — Manual Email Recovery (${blacklist.length})</div>
+    <div style="font-size:8px;color:rgba(192,200,216,0.3);padding:6px 0 8px;line-height:1.6">No email found automatically. Find their email manually and add it here — they'll enter the pipeline immediately.</div>
+    ${blacklist.length
+      ?'<div style="overflow-x:auto;max-height:220px;overflow-y:auto"><table class="p-table"><thead><tr><th>Business</th><th>Location</th><th>Add Email</th></tr></thead><tbody>'+blacklistRows+'</tbody></table></div>'
+      :'<div class="p-empty">⬡ BLACKLIST EMPTY</div>'
+    }
+  </div>`;
+}
+
+async function addBlacklistEmail(idx, name, location, address, phone){
+  const input=document.getElementById('bl-'+idx);
+  const email=input?.value?.trim();
+  if(!email||!email.includes('@'))return;
+  const lead=STATE.binned.find(b=>b.name===name&&b.blacklisted);
+  if(!lead){addLog('SENTINEL','Lead not found in blacklist','e');return}
+  lead.email=email;
+  lead.blacklisted=false;
+  if(lead.id)await sbUpdate('scout_leads',lead.id,{'Email':email,'Email_found':true,'Lead_temp':'WARM'});
+  STATE.leads.push({...lead});
+  STATE.binned=STATE.binned.filter(b=>!(b.name===name&&b.blacklisted===false));
+  triggerParallelPipeline({...lead,email});
+  addLog('SENTINEL','Manual email added: '+name+' → '+email+' — entering pipeline','s');
+  if(currentAgent?.id==='SENTINEL')renderAgentPanel('SENTINEL');
 }
 
 // SAM PANEL
