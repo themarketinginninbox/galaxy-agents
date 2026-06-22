@@ -285,11 +285,27 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
   <iframe id="preview-frame" style="flex:1;border:none;width:100%;background:#fff"></iframe>
 </div>
 
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay" style="display:flex;position:fixed;inset:0;z-index:900;background:#07050A;align-items:center;justify-content:center;flex-direction:column">
+  <div style="text-align:center;margin-bottom:40px">
+    <div style="font-family:'Orbitron',sans-serif;font-size:28px;font-weight:900;letter-spacing:6px;color:#00B4D8;margin-bottom:8px">🧠 GALAXY</div>
+    <div style="font-size:9px;letter-spacing:4px;color:rgba(192,200,216,0.4);text-transform:uppercase">Autonomous Sales Intelligence</div>
+  </div>
+  <div style="width:100%;max-width:340px;padding:0 24px">
+    <div id="login-error" style="font-size:9px;color:#FF3355;text-align:center;margin-bottom:12px;min-height:16px"></div>
+    <input id="login-email" type="email" placeholder="Email address" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(0,180,216,0.2);border-radius:6px;padding:14px 16px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;margin-bottom:12px">
+    <input id="login-password" type="password" placeholder="Password" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(0,180,216,0.2);border-radius:6px;padding:14px 16px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;margin-bottom:20px">
+    <button ontouchstart="handleLogin()" onclick="handleLogin()" style="width:100%;padding:14px;background:#00B4D8;border:none;border-radius:6px;color:#07050A;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;touch-action:manipulation;margin-bottom:12px">SIGN IN</button>
+    <button ontouchstart="handleSignup()" onclick="handleSignup()" style="width:100%;padding:14px;background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;touch-action:manipulation">CREATE ACCOUNT</button>
+    <div id="login-msg" style="font-size:9px;color:#00FF88;text-align:center;margin-top:12px;min-height:16px"></div>
+  </div>
+</div>
+
 <!-- SETTINGS OVERLAY -->
 <div id="settings-overlay" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(1,2,8,0.92);backdrop-filter:blur(12px);overflow-y:auto;padding:24px 20px 40px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
     <div style="font-family:'Orbitron',sans-serif;font-size:14px;font-weight:900;letter-spacing:4px;color:#00B4D8">⚙ SETTINGS</div>
-    <button onclick="document.getElementById('settings-overlay').style.display='none'" style="background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;padding:6px 14px;cursor:pointer">✕ CLOSE</button>
+    <div style="display:flex;gap:8px"><button onclick="signOut()" style="background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:6px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:10px;padding:6px 12px;cursor:pointer">SIGN OUT</button><button onclick="document.getElementById('settings-overlay').style.display='none'" style="background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;padding:6px 14px;cursor:pointer">✕ CLOSE</button></div>
   </div>
 
   <!-- GITHUB TOKEN -->
@@ -410,7 +426,7 @@ const STATE = {
   scannerRunning: false, dispatchRunning: false, sentinelRunning: false,
   scoutStopped: false, forgeStopped: false, launchStopped: false,
   scannerStopped: false, dispatchStopped: false, sentinelStopped: false,
-  demoMode: false, demoEmail: '', instantlyKey: '', workerUrl: '', netlifyToken: '', cfPagesToken: '', cfAccountId: '', githubToken: '',
+  demoMode: false, demoEmail: '', instantlyKey: '', workerUrl: '', netlifyToken: '', cfPagesToken: '', cfAccountId: '', githubToken: '', disabled:{SCOUT:false,FORGE:false,LAUNCH:false,SCANNER:false,DISPATCH:false,SENTINEL:false},
   logs: { SCOUT:[], FORGE:[], LAUNCH:[], SCANNER:[], DISPATCH:[], SENTINEL:[], SAM:[] },
   stats: { leads:0, built:0, live:0, sent:0 }
 };
@@ -1443,6 +1459,43 @@ async function resetGalaxy(){
   }
 }
 
+function stopAgent(id){
+  STATE.disabled[id]=true;
+  // Also set the stopped flag
+  if(id==='SCOUT')STATE.scoutStopped=true;
+  if(id==='FORGE')STATE.forgeStopped=true;
+  if(id==='LAUNCH')STATE.launchStopped=true;
+  if(id==='SCANNER')STATE.scannerStopped=true;
+  if(id==='DISPATCH')STATE.dispatchStopped=true;
+  if(id==='SENTINEL')STATE.sentinelStopped=true;
+  setNodeStatus(id,'IDLE');
+  addLog(id,`${id} disabled for this session — tap ENABLE to re-activate`,'w');
+  if(currentAgent?.id===id)renderAgentPanel(id);
+}
+function enableAgent(id){
+  STATE.disabled[id]=false;
+  addLog(id,`${id} re-enabled`,'s');
+  if(currentAgent?.id===id)renderAgentPanel(id);
+}
+
+function stopAgent(id){
+  STATE.disabled[id]=true;
+  if(id==='SCOUT'){STATE.scoutStopped=true;STATE.pipelineStopped=true;}
+  if(id==='FORGE')STATE.forgeStopped=true;
+  if(id==='LAUNCH')STATE.launchStopped=true;
+  if(id==='SCANNER')STATE.scannerStopped=true;
+  if(id==='DISPATCH')STATE.dispatchStopped=true;
+  if(id==='SENTINEL')STATE.sentinelStopped=true;
+  setNodeStatus(id,'IDLE');
+  addLog(id,id+' disabled for this session','w');
+  if(currentAgent?.id===id)renderAgentPanel(id);
+}
+function enableAgent(id){
+  STATE.disabled[id]=false;
+  addLog(id,id+' re-enabled','s');
+  if(currentAgent?.id===id)renderAgentPanel(id);
+}
+
 function openSettings(){
   const overlay=document.getElementById('settings-overlay');
   overlay.style.display='block';
@@ -1559,6 +1612,101 @@ function clearSettingInstantly(){
   document.getElementById('s-instantly-key').value='';
 }
 
+// ═══════════════════════════════════════════
+// SUPABASE AUTH
+// ═══════════════════════════════════════════
+let currentUser=null;
+
+async function sbAuth(endpoint, body){
+  const r=await fetch(`${SUPABASE_URL}/auth/v1/${endpoint}`,{
+    method:'POST',
+    headers:{'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  return r.json();
+}
+
+async function handleLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
+  const err=document.getElementById('login-error');
+  const msg=document.getElementById('login-msg');
+  if(!email||!password){err.textContent='Enter email and password';return}
+  err.textContent='';msg.textContent='Signing in...';
+  const d=await sbAuth('token?grant_type=password',{email,password});
+  if(d.access_token){
+    currentUser=d.user;
+    localStorage.setItem('galaxy_auth_token',d.access_token);
+    localStorage.setItem('galaxy_refresh_token',d.refresh_token);
+    document.getElementById('login-overlay').style.display='none';
+    loadSavedKeys();
+  } else {
+    err.textContent=d.error_description||d.msg||'Invalid credentials';
+    msg.textContent='';
+  }
+}
+
+async function handleSignup(){
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
+  const err=document.getElementById('login-error');
+  const msg=document.getElementById('login-msg');
+  if(!email||!password){err.textContent='Enter email and password';return}
+  if(password.length<6){err.textContent='Password must be at least 6 characters';return}
+  err.textContent='';msg.textContent='Creating account...';
+  const d=await sbAuth('signup',{email,password});
+  if(d.id||d.user?.id){
+    msg.textContent='✅ Account created — check email to confirm, then sign in';
+  } else {
+    err.textContent=d.error_description||d.msg||'Signup failed';
+    msg.textContent='';
+  }
+}
+
+async function checkSession(){
+  const token=localStorage.getItem('galaxy_auth_token');
+  if(!token){return false}
+  // Verify token is still valid
+  const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${token}`}
+  });
+  const d=await r.json();
+  if(d.id){
+    currentUser=d;
+    return true;
+  }
+  // Try refresh
+  const refresh=localStorage.getItem('galaxy_refresh_token');
+  if(refresh){
+    const rd=await sbAuth('token?grant_type=refresh_token',{refresh_token:refresh});
+    if(rd.access_token){
+      localStorage.setItem('galaxy_auth_token',rd.access_token);
+      localStorage.setItem('galaxy_refresh_token',rd.refresh_token);
+      currentUser=rd.user;
+      return true;
+    }
+  }
+  localStorage.removeItem('galaxy_auth_token');
+  localStorage.removeItem('galaxy_refresh_token');
+  return false;
+}
+
+function signOut(){
+  localStorage.removeItem('galaxy_auth_token');
+  localStorage.removeItem('galaxy_refresh_token');
+  currentUser=null;
+  document.getElementById('login-overlay').style.display='flex';
+}
+
+// Check session on load
+checkSession().then(valid=>{
+  if(valid){
+    document.getElementById('login-overlay').style.display='none';
+    loadSavedKeys();
+  }
+  // If not valid, login overlay stays visible
+});
+
 // Load saved keys on startup
 loadSavedKeys();
 
@@ -1601,7 +1749,7 @@ function renderAgentStatsOnly(id){
     case 'FORGE': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.forgeQueue.filter(i=>i.status==='queued').length}</span><span class="l">QUEUED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">${STATE.forgeQueue.filter(i=>i.status==='building').length}</span><span class="l">BUILDING</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.forgeQueue.filter(i=>i.status==='saved').length}</span><span class="l">BUILT</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.forgeQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div></div>`;
     case 'LAUNCH': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.launchQueue.filter(i=>i.status==='queued').length}</span><span class="l">QUEUED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">${STATE.launchQueue.filter(i=>i.status==='deploying').length}</span><span class="l">DEPLOYING</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.launchQueue.filter(i=>i.status==='live').length}</span><span class="l">LIVE</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.launchQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div></div>`;
     case 'SCANNER': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--scanner)">${STATE.scannerQueue.length}</span><span class="l">TOTAL</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.scannerQueue.filter(i=>i.status==='approved').length}</span><span class="l">APPROVED</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.scannerQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.scannerQueue.filter(i=>i.status==='requeued').length}</span><span class="l">REQUEUED</span></div></div>`;
-    case 'DISPATCH': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--dispatch)">${STATE.dispatchQueue.length}</span><span class="l">IN QUEUE</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">SENT</span></div><div class="p-stat"><span class="v" style="color:var(--red)">0</span><span class="l">BOUNCED</span></div><div class="p-stat"><span class="v" style="color:var(--dispatch)">david@</span><span class="l">INBOX</span></div></div>`;
+    case 'DISPATCH': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--dispatch)">${STATE.dispatchQueue.length}</span><span class="l">IN QUEUE</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">SENT</span></div><div class="p-stat"><span class="v" style="color:var(--red)">0</span><span class="l">BOUNCED</span></div><div class="p-stat"><span class="v" style="color:var(--green)">0</span><span class="l">CONVERTED</span></div></div>`;
     case 'SENTINEL': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--sentinel)">${STATE.binned.length}</span><span class="l">IN BIN</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentinelFound||0}</span><span class="l">RECOVERED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">1</span><span class="l">DOMAINS</span></div><div class="p-stat"><span class="v" style="color:var(--green)">9.8</span><span class="l">HEALTH</span></div></div>`;
     default: return '';
   }
@@ -1699,6 +1847,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.ac-wrap')){const l=
 function renderAgentPanel(id){
   const c=document.getElementById('panel-content');
   const running=STATE[id.toLowerCase()+'Running'];
+
   switch(id){
     case 'GALAXY': c.innerHTML=renderGalaxyPanel();break;
     case 'SCOUT':  c.innerHTML=renderScoutPanel();break;
@@ -1765,7 +1914,7 @@ function renderScoutPanel(){
   ${running
     ?`<div class="running-badge active"><div class="rb-dot"></div>SCOUT SCANNING — ${STATE.scoutLocation||''} / ${STATE.scoutNiche||''}</div>
       <div class="pipeline-note" style="margin-bottom:12px">Leads with emails are instantly passed to FORGE for building.</div>
-      <button class="p-btn stop" onclick="STATE.scoutStopped=true;STATE.pipelineStopped=true">⬛ STOP SCOUT</button>`
+      <button class="p-btn stop" onclick="STATE.disabled['SCOUT']?enableAgent('SCOUT'):stopAgent('SCOUT')" style="${STATE.disabled&&STATE.disabled['SCOUT']?'background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.4);color:#00FF88':''}">${STATE.disabled&&STATE.disabled['SCOUT']?'▶ RESUME SCOUT':'⬛ STOP SCOUT'}</button>`
     :`<div class="pipeline-note">Use the machine switch to activate SCOUT. It will run automatically as part of the full pipeline.</div>`
   }
   <div class="p-progress" id="prog-SCOUT"><div class="p-progress-label" id="progl-SCOUT"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SCOUT"></div></div></div>
@@ -1794,7 +1943,7 @@ function renderForgePanel(){
   ${STATE.forgeRunning
     ?`<div class="running-badge active"><div class="rb-dot"></div>FORGE BUILDING — ${STATE.forgeQueue.filter(i=>i.status==='building').length} active</div>
       <div class="pipeline-note" style="margin-bottom:12px">Building sites in parallel with SCOUT scanning. Completed builds go straight to LAUNCH.</div>
-      <button class="p-btn stop" onclick="STATE.forgeStopped=true">⬛ STOP FORGE</button>`
+      <button class="p-btn stop" onclick="STATE.disabled['FORGE']?enableAgent('FORGE'):stopAgent('FORGE')" style="${STATE.disabled&&STATE.disabled['FORGE']?'background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.4);color:#00FF88':''}">${STATE.disabled&&STATE.disabled['FORGE']?'▶ RESUME FORGE':'⬛ STOP FORGE'}</button>`
     :`<div class="pipeline-note">FORGE activates automatically when SCOUT finds leads with emails. No manual input needed.</div>`
   }
   <div class="p-progress" id="prog-FORGE"><div class="p-progress-label" id="progl-FORGE"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-FORGE"></div></div></div>
@@ -1823,7 +1972,7 @@ function renderLaunchPanel(){
   ${STATE.launchRunning
     ?`<div class="running-badge active"><div class="rb-dot"></div>LAUNCH DEPLOYING TO GITHUB PAGES</div>
       <div class="pipeline-note" style="margin-bottom:12px">Deploying sites as FORGE completes them. Each site gets its own GitHub Pages URL.</div>
-      <button class="p-btn stop" onclick="STATE.launchStopped=true">⬛ STOP LAUNCH</button>`
+      <button class="p-btn stop" onclick="STATE.disabled['LAUNCH']?enableAgent('LAUNCH'):stopAgent('LAUNCH')" style="${STATE.disabled&&STATE.disabled['LAUNCH']?'background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.4);color:#00FF88':''}">${STATE.disabled&&STATE.disabled['LAUNCH']?'▶ RESUME LAUNCH':'⬛ STOP LAUNCH'}</button>`
     :`<div class="pipeline-note">LAUNCH activates automatically when FORGE completes a site. Deploys straight to GitHub Pages with no manual input.</div>`
   }
   <div class="p-progress" id="prog-LAUNCH"><div class="p-progress-label" id="progl-LAUNCH"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-LAUNCH"></div></div></div>
@@ -1852,7 +2001,7 @@ function renderScannerPanel(){
   ${STATE.scannerRunning
     ?`<div class="running-badge active"><div class="rb-dot"></div>SCANNER CHECKING QUALITY</div>
       <div class="pipeline-note" style="margin-bottom:12px">Checking each live site before it goes to DISPATCH. Approved sites enter the email queue instantly.</div>
-      <button class="p-btn stop" onclick="STATE.scannerStopped=true">⬛ STOP SCANNER</button>`
+      <button class="p-btn stop" onclick="STATE.disabled['SCANNER']?enableAgent('SCANNER'):stopAgent('SCANNER')" style="${STATE.disabled&&STATE.disabled['SCANNER']?'background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.4);color:#00FF88':''}">${STATE.disabled&&STATE.disabled['SCANNER']?'▶ RESUME SCANNER':'⬛ STOP SCANNER'}</button>`
     :`<div class="pipeline-note">SCANNER activates automatically when LAUNCH deploys a site. No manual input needed.</div>`
   }
   <div class="p-progress" id="prog-SCANNER"><div class="p-progress-label" id="progl-SCANNER"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SCANNER"></div></div></div>
@@ -1876,7 +2025,7 @@ function renderDispatchPanel(){
     <div class="p-stat"><span class="v" style="color:var(--dispatch)">${STATE.dispatchQueue.length}</span><span class="l">IN QUEUE</span></div>
     <div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">SENT</span></div>
     <div class="p-stat"><span class="v" style="color:var(--red)">0</span><span class="l">BOUNCED</span></div>
-    <div class="p-stat"><span class="v" style="color:var(--dispatch)">david@</span><span class="l">INBOX</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">0</span><span class="l">CONVERTED</span></div>
   </div>
   ${STATE.dispatchRunning?`<div class="running-badge active"><div class="rb-dot"></div>DISPATCH RUNNING</div>`:''}
 
@@ -1917,7 +2066,7 @@ function renderDispatchPanel(){
     <input type="range" id="delay-slider" min="10" max="120" value="${STATE.sendDelay||30}" oninput="STATE.sendDelay=parseInt(this.value);document.getElementById('delay-label').textContent=this.value+'s between emails'">
   </div>
   ${STATE.dispatchRunning
-    ?`<button class="p-btn stop" style="margin-top:12px" onclick="STATE.dispatchStopped=true">⬛ STOP DISPATCH</button>`
+    ?`<button class="p-btn stop" style="margin-top:12px" onclick="STATE.disabled['DISPATCH']?enableAgent('DISPATCH'):stopAgent('DISPATCH')">${STATE.disabled&&STATE.disabled['DISPATCH']?'▶ RESUME DISPATCH':'⬛ STOP DISPATCH'}</button>`
     :`<div class="pipeline-note" style="margin-top:12px">DISPATCH fires automatically after SCANNER approves. Leads get added to the Instantly campaign and sent within UK business hours.</div>`
   }
   <div class="p-progress" id="prog-DISPATCH"><div class="p-progress-label" id="progl-DISPATCH"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-DISPATCH"></div></div></div>
@@ -1949,7 +2098,7 @@ function renderSentinelPanel(){
     <div class="p-stat"><span class="v" style="color:var(--red)">${blacklist.length}</span><span class="l">BLACKLIST</span></div>
   </div>
   ${STATE.sentinelRunning
-    ?'<div class="running-badge active"><div class="rb-dot"></div>SENTINEL DEEP SEARCHING</div><div class="pipeline-note" style="margin-bottom:12px">Searching for emails — found leads go back into the pipeline.</div><button class="p-btn stop" onclick="STATE.sentinelStopped=true">⬛ STOP SENTINEL</button>'
+    ?`<div class="running-badge active"><div class="rb-dot"></div>SENTINEL DEEP SEARCHING</div><div class="pipeline-note" style="margin-bottom:12px">Searching for emails — found leads go back into the pipeline.</div><button class="p-btn stop" onclick="STATE.disabled['SENTINEL']?enableAgent('SENTINEL'):stopAgent('SENTINEL')" style="${STATE.disabled&&STATE.disabled['SENTINEL']?'background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.4);color:#00FF88':''}">${STATE.disabled&&STATE.disabled['SENTINEL']?'▶ RESUME SENTINEL':'⬛ STOP SENTINEL'}</button>`
     :'<div class="pipeline-note">SENTINEL auto-runs after SCOUT. Track 1 (no website) leads recovered here re-enter the pipeline. Leads with no findable email go to BLACKLIST for manual recovery.</div>'
   }
   <div class="p-progress" id="prog-SENTINEL"><div class="p-progress-label" id="progl-SENTINEL"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SENTINEL"></div></div></div>
