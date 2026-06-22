@@ -3006,148 +3006,103 @@ async function startDispatch(){
 // ═══════════════════════════════════════════
 // SENTINEL LOGIC — Deep Email Recovery
 // ═══════════════════════════════════════════
-async function sentinelScrape(url){
-  // Use Worker to scrape server-side — bypasses CORS and JS rendering issues
-  try{
-    const d=await workerFetch('scrape_url',{url});
-    return d.ok?d.html:'';
-  }catch{
-    // Fallback to allorigins
-    try{const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,{signal:AbortSignal.timeout(8000)});const d=await r.json();return d.contents||''}catch{return ''}
-  }
-}
-
 async function startSentinel(){
   STATE.sentinelRunning=true;STATE.sentinelStopped=false;STATE.sentinelFound=0;
   setNodeStatus('SENTINEL','RUNNING');
-  addLog('SENTINEL','Sentinel started — recovering emails from missed leads','s');
+  addLog('SENTINEL','🤖 Claude-powered email search activated','s');
   if(currentAgent?.id==='SENTINEL')renderAgentPanel('SENTINEL');
 
   try{
-    // Pull COLD leads (have website but no email found) + binned STATE leads
+    // Pull leads with no email from Supabase + in-memory binned
     const coldLeads=await sbGet('scout_leads','Email_found=eq.false&order=Created_at.desc&limit=30&select=*');
-    const stateLeads=STATE.binned.filter(l=>l.website&&!l.email);
-    
-    // Merge, deduplicate by name
+    const stateLeads=STATE.binned.filter(l=>!l.email);
+
+    // Merge + deduplicate by name
     const seen=new Set();
     const allLeads=[...coldLeads,...stateLeads].filter(l=>{
-      if(seen.has(l.name))return false;
-      seen.add(l.name);
+      const key=(l.name||l.Business_name||'').toLowerCase();
+      if(!key||seen.has(key))return false;
+      seen.add(key);
       return true;
     });
 
-    if(!allLeads.length){addLog('SENTINEL','No leads to recover — all have emails or no website','w');STATE.sentinelRunning=false;setNodeStatus('SENTINEL','IDLE');return}
-    addLog('SENTINEL',`Found ${allLeads.length} leads to recover`,'i');
+    if(!allLeads.length){
+      addLog('SENTINEL','No leads to recover','w');
+      STATE.sentinelRunning=false;setNodeStatus('SENTINEL','IDLE');return;
+    }
+    addLog('SENTINEL',`${allLeads.length} leads to hunt — asking Claude for each`,'i');
+
+    let creditsGone=false;
 
     for(let i=0;i<allLeads.length;i++){
       if(STATE.sentinelStopped)break;
+      if(creditsGone)break;
+
       const lead=allLeads[i];
-      pBar('SENTINEL',Math.round((i+1)/allLeads.length*100),`${i+1}/${allLeads.length} — ${lead.name}`);
-      addLog('SENTINEL',`🔍 Hunting: ${lead.name}`,'i');
+      const name=lead.name||lead.Business_name||'Unknown';
+      const location=lead.location||lead.Location||'';
+      const niche=lead.niche||lead.Category||'';
+      const website=lead.website||lead.Website||'';
 
-      let found=null;
+      pBar('SENTINEL',Math.round((i+1)/allLeads.length*100),`${i+1}/${allLeads.length} — ${name}`);
+      addLog('SENTINEL',`🔍 Asking Claude to find: ${name}${location?' in '+location:''}`,'i');
 
-      // Source 1 — scrape homepage via Worker
-      if(!found&&lead.website){
-        try{
-          const html=await sentinelScrape(lead.website);
-          const emails=extractEmails(html);
-          if(emails[0]){found={email:emails[0],source:'Homepage'}}
-        }catch{}
-      }
+      try{
+        const d=await workerFetch('search_email',{
+          business_name:name,
+          location,
+          niche,
+          website
+        });
 
-      // Source 2 — scrape /contact page
-      if(!found&&lead.website){
-        try{
-          const contactUrl=lead.website.replace(/\/$/,'')+'/contact';
-          const html=await sentinelScrape(contactUrl);
-          const emails=extractEmails(html);
-          if(emails[0]){found={email:emails[0],source:'Contact page'}}
-        }catch{}
-      }
-
-      // Source 3 — scrape /about page
-      if(!found&&lead.website){
-        try{
-          const aboutUrl=lead.website.replace(/\/$/,'')+'/about';
-          const html=await sentinelScrape(aboutUrl);
-          const emails=extractEmails(html);
-          if(emails[0]){found={email:emails[0],source:'About page'}}
-        }catch{}
-      }
-
-      // Source 4 — Google search scrape via Worker
-      if(!found){
-        try{
-          const q=encodeURIComponent(`"${lead.name}" ${lead.location||''} email`);
-          const html=await sentinelScrape(`https://www.google.com/search?q=${q}`);
-          const emails=extractEmails(html);
-          if(emails[0]){found={email:emails[0],source:'Google'}}
-        }catch{}
-      }
-
-      // Source 5 — DuckDuckGo
-      if(!found){
-        try{
-          const q=encodeURIComponent(`${lead.name} ${lead.location||''} contact email`);
-          const html=await sentinelScrape(`https://html.duckduckgo.com/html/?q=${q}`);
-          const emails=extractEmails(html);
-          if(emails[0]){found={email:emails[0],source:'DuckDuckGo'}}
-        }catch{}
-      }
-
-      // Source 6 — Bing
-      if(!found){
-        try{
-          const q=encodeURIComponent(`${lead.name} ${lead.location||''} email contact`);
-          const html=await sentinelScrape(`https://www.bing.com/search?q=${q}`);
-          const emails=extractEmails(html);
-          if(emails[0]){found={email:emails[0],source:'Bing'}}
-        }catch{}
-      }
-
-      // Source 7 — Yell.com (UK business directory)
-      if(!found){
-        try{
-          const q=encodeURIComponent(lead.name);
-          const loc=encodeURIComponent(lead.location||'UK');
-          const html=await sentinelScrape(`https://www.yell.com/s/${q}-${loc}.html`);
-          const emails=extractEmails(html);
-          if(emails[0]){found={email:emails[0],source:'Yell.com'}}
-        }catch{}
-      }
-
-      // Source 8 — Scoot.co.uk
-      if(!found){
-        try{
-          const q=encodeURIComponent(`${lead.name} ${lead.location||''}`);
-          const html=await sentinelScrape(`https://www.scoot.co.uk/find/${q}`);
-          const emails=extractEmails(html);
-          if(emails[0]){found={email:emails[0],source:'Scoot.co.uk'}}
-        }catch{}
-      }
-
-      if(found){
-        STATE.sentinelFound++;
-        addLog('SENTINEL',`✅ Found via ${found.source}: ${lead.name} → ${found.email}`,'s');
-        if(lead.id){
-          await sbUpdate('scout_leads',lead.id,{'Email':found.email,'Email_found':true,'Lead_temp':'WARM'});
+        if(d.no_credits){
+          addLog('SENTINEL','⚠️ No Anthropic credits — top up at console.anthropic.com to enable Claude search','w');
+          creditsGone=true;
+          break;
         }
-        // Add to active leads for this session
-        const updatedLead={...lead,email:found.email,lead_temp:'WARM',email_found:true};
-        STATE.leads.push(updatedLead);
-        STATE.stats.leads=STATE.leads.length;
-        // Remove from binned
-        STATE.binned=STATE.binned.filter(l=>l.name!==lead.name);
-        updateBottomBar();
-      } else {
-        addLog('SENTINEL',`❌ No email: ${lead.name}`,'w');
+
+        if(d.ok && d.email){
+          STATE.sentinelFound++;
+          addLog('SENTINEL',`✅ Claude found: ${name} → ${d.email}`,'s');
+
+          // Update Supabase if this lead has a DB id
+          if(lead.id){
+            await sbUpdate('scout_leads',lead.id,{
+              'Email':d.email,
+              'Email_found':true,
+              'Lead_temp':'WARM'
+            });
+          }
+
+          // Push back into active pipeline
+          const updatedLead={...lead,email:d.email,lead_temp:'WARM',email_found:true};
+          STATE.leads.push(updatedLead);
+          STATE.stats.leads=STATE.leads.length;
+          STATE.binned=STATE.binned.filter(l=>(l.name||l.Business_name)!==name);
+          updateBottomBar();
+
+        } else {
+          addLog('SENTINEL',`❌ Claude couldn't find email for: ${name}`,'w');
+        }
+
+      }catch(e){
+        addLog('SENTINEL',`Error on ${name}: ${e.message}`,'e');
       }
 
       if(currentAgent?.id==='SENTINEL')renderAgentPanel('SENTINEL');
-      await new Promise(r=>setTimeout(r,300));
+
+      // Small pause between Claude calls to avoid rate limits
+      if(i<allLeads.length-1&&!STATE.sentinelStopped){
+        await new Promise(r=>setTimeout(r,1500));
+      }
     }
-    addLog('SENTINEL',`Done. ${STATE.sentinelFound}/${allLeads.length} emails recovered`,'s');
+
+    if(creditsGone){
+      addLog('SENTINEL',`Stopped — add Anthropic credits to continue. ${STATE.sentinelFound} found before cutoff`,'w');
+    } else {
+      addLog('SENTINEL',`Done. ${STATE.sentinelFound}/${allLeads.length} emails recovered by Claude`,'s');
+    }
+
   }catch(e){addLog('SENTINEL',`Error: ${e.message}`,'e')}
 
   STATE.sentinelRunning=false;setNodeStatus('SENTINEL','DONE');
