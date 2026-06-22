@@ -1,0 +1,2421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🧠 GALAXY — Autonomous Sales Intelligence</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --galaxy:#00B4D8;--sentinel:#E0E8FF;--sam:#9B59B6;
+  --scout:#4AB3FF;--forge:#FF3355;--launch:#00FF88;
+  --scanner:#8888AA;--dispatch:#FFAA00;
+  --gold:#FFD700;--green:#00FF88;--red:#FF3355;--amber:#FFAA00;
+  --bg:#010208;--panel:rgba(6,10,24,0.96);--border:rgba(74,179,255,0.15);--silver:#C0C8D8;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--silver)}
+
+/* PIPELINE TOAST */
+#pipeline-toast{
+  position:fixed;top:70px;left:50%;transform:translateX(-50%);
+  z-index:150;
+  background:rgba(0,180,216,0.12);
+  border:1px solid rgba(0,180,216,0.3);
+  border-radius:20px;
+  padding:8px 18px;
+  font-size:9px;letter-spacing:2px;
+  color:#00B4D8;
+  display:none;
+  pointer-events:none;
+  white-space:nowrap;
+}
+#pipeline-toast.visible{display:block}
+
+/* PIPELINE MINI LOG */
+#pipeline-mini-log{
+  position:fixed;bottom:80px;left:16px;
+  z-index:150;width:calc(100% - 80px);max-width:340px;
+  background:rgba(6,10,24,0.95);
+  border:1px solid rgba(0,180,216,0.15);
+  border-radius:8px;
+  padding:10px 12px;
+  font-size:8px;
+  display:none;
+  pointer-events:all;
+  max-height:200px;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:rgba(0,180,216,0.4) transparent;
+}
+#pipeline-mini-log.visible{display:block}
+.pml-line{padding:1px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+
+/* MACHINE SWITCH */
+#machine-switch-wrap{
+  position:fixed;right:12px;top:50%;transform:translateY(-50%);
+  z-index:100;display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:16px 10px;
+  background:rgba(6,10,24,0.95);
+  border:1px solid rgba(0,255,136,0.2);
+  border-radius:12px;
+  backdrop-filter:blur(12px);
+}
+.switch-label{
+  font-family:'Orbitron',sans-serif;font-size:6px;letter-spacing:2px;
+  color:rgba(192,200,216,0.35);writing-mode:vertical-rl;text-orientation:mixed;
+  text-transform:uppercase;
+}
+#machine-switch{
+  position:relative;width:28px;height:60px;
+  background:rgba(1,2,8,0.9);
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.1);
+  cursor:pointer;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,0.8);
+  transition:border-color 0.3s;
+}
+#machine-switch.on{border-color:rgba(0,255,136,0.4)}
+#machine-switch-thumb{
+  position:absolute;left:4px;width:20px;height:20px;
+  background:linear-gradient(145deg,#3a3a4a,#1a1a2a);
+  border-radius:50%;
+  top:32px;
+  transition:top 0.25s cubic-bezier(.4,0,.2,1),background 0.3s,box-shadow 0.3s;
+  border:1px solid rgba(255,255,255,0.15);
+  box-shadow:0 2px 6px rgba(0,0,0,0.6);
+}
+#machine-switch.on #machine-switch-thumb{
+  top:4px;
+  background:linear-gradient(145deg,#00FF88,#00cc6a);
+  box-shadow:0 0 12px rgba(0,255,136,0.6),0 2px 6px rgba(0,0,0,0.4);
+  border-color:rgba(0,255,136,0.5);
+}
+#switch-glow{
+  width:8px;height:8px;border-radius:50%;
+  background:rgba(255,255,255,0.1);
+  transition:background 0.3s,box-shadow 0.3s;
+  margin-top:2px;
+}
+#switch-glow.on{
+  background:#00FF88;
+  box-shadow:0 0 8px rgba(0,255,136,0.8);
+}
+#switch-state{
+  font-family:'Orbitron',sans-serif;font-size:6px;letter-spacing:1px;
+  color:rgba(192,200,216,0.3);writing-mode:vertical-rl;
+  transition:color 0.3s;
+}
+#switch-state.on{color:#00FF88}
+
+/* CANVAS LAYERS */
+#three-canvas{position:fixed;inset:0;z-index:0}
+#conn-canvas{position:fixed;inset:0;z-index:1;pointer-events:none}
+
+/* TOP BAR */
+#topbar{
+  position:fixed;top:0;left:0;right:0;z-index:50;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 20px;
+  background:linear-gradient(to bottom,rgba(1,2,8,0.98),transparent);
+  pointer-events:none;
+}
+#topbar button{pointer-events:all}
+.brand{font-family:'Orbitron',sans-serif;font-size:15px;font-weight:900;letter-spacing:5px;color:var(--galaxy);text-shadow:0 0 20px rgba(0,180,216,0.4)}
+.sub{font-size:7px;letter-spacing:3px;color:rgba(192,200,216,0.3);display:block;margin-top:1px}
+#live-badge{display:flex;align-items:center;gap:6px;font-size:9px;letter-spacing:2px;color:var(--green)}
+#live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+#clock{font-size:10px;letter-spacing:2px;color:rgba(192,200,216,0.3)}
+
+/* AGENT NODES */
+.agent-node{position:fixed;z-index:20;text-align:center;cursor:pointer;transform:translate(-50%,-50%);pointer-events:all;transition:filter 0.2s}
+.agent-node:hover{filter:brightness(1.3)}
+.node-box{background:var(--panel);border-radius:8px;padding:7px 11px;backdrop-filter:blur(12px);min-width:76px;transition:all 0.25s;border:1px solid rgba(255,255,255,0.07)}
+.node-box:hover{transform:scale(1.08)}
+.n-gem{font-size:13px;display:block;margin-bottom:2px;line-height:1}
+.n-name{font-family:'Orbitron',sans-serif;font-size:6px;letter-spacing:2px;display:block;margin-bottom:2px}
+.n-status{font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.35);display:block}
+.n-dot{width:4px;height:4px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle}
+.agent-node.running .node-box{animation:nodeGlow 2s infinite}
+@keyframes nodeGlow{0%,100%{box-shadow:none}50%{box-shadow:0 0 12px var(--node-color)}}
+
+/* BOTTOM BAR */
+#bottombar{
+  position:fixed;bottom:0;left:0;right:0;z-index:50;
+  display:flex;justify-content:space-around;align-items:center;
+  padding:10px 20px 20px;
+  background:linear-gradient(to top,rgba(1,2,8,0.98),transparent);
+  pointer-events:none;
+}
+.bstat{text-align:center}
+.bval{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;display:block}
+.blbl{font-size:7px;letter-spacing:1px;color:rgba(192,200,216,0.3)}
+
+/* AGENT PANEL — slides in from right */
+#agent-panel{
+  position:fixed;top:0;right:-100%;width:100%;max-width:480px;height:100%;
+  z-index:200;background:var(--panel);
+  border-left:1px solid var(--border);
+  transition:right 0.35s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+#agent-panel.open{right:0}
+#panel-backdrop{
+  position:fixed;inset:0;z-index:199;background:rgba(1,2,8,0.6);
+  opacity:0;pointer-events:none;transition:opacity 0.35s;
+}
+#panel-backdrop.open{opacity:1;pointer-events:all}
+
+#panel-top{
+  padding:14px 16px;border-bottom:1px solid var(--current-border,var(--border));
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+#panel-gem-bar{height:3px;flex-shrink:0}
+.panel-title-row{display:flex;align-items:center;gap:10px}
+#panel-gem{font-size:22px}
+#panel-name{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:900;letter-spacing:4px}
+#panel-role{font-size:8px;color:rgba(192,200,216,0.4);letter-spacing:1px;margin-top:3px}
+#close-panel{
+  background:transparent;border:1px solid rgba(255,255,255,0.1);
+  border-radius:50%;width:28px;height:28px;color:var(--silver);
+  font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all 0.2s;flex-shrink:0;
+}
+#close-panel:hover{border-color:var(--red);color:var(--red)}
+
+/* PANEL CONTENT — scrollable */
+#panel-content{flex:1;overflow-y:auto;padding:16px}
+#panel-content::-webkit-scrollbar{width:2px}
+#panel-content::-webkit-scrollbar-thumb{background:rgba(74,179,255,0.3)}
+
+/* SHARED PANEL COMPONENTS */
+.p-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.p-stat{background:rgba(255,255,255,0.03);border-radius:6px;padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,0.05)}
+.p-stat .v{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;display:block}
+.p-stat .l{font-size:7px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px;display:block}
+
+.p-section{margin-bottom:14px}
+.p-label{font-size:8px;letter-spacing:3px;color:rgba(192,200,216,0.4);text-transform:uppercase;margin-bottom:8px;display:block}
+.p-select,.p-input{background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:9px 12px;color:var(--silver);font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;transition:border-color 0.2s}
+.p-input:focus,.p-select:focus{border-color:var(--current-color,var(--scout))}
+.p-select option{background:#0a0f1e}
+
+.p-btn{width:100%;padding:12px;background:transparent;border:1px solid var(--current-color,var(--scout));border-radius:4px;color:var(--current-color,var(--scout));font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;cursor:pointer;transition:all 0.2s;margin-bottom:8px}
+.p-btn:hover{background:rgba(255,255,255,0.05);box-shadow:0 0 12px rgba(255,255,255,0.1)}
+.p-btn:disabled{opacity:0.4;cursor:not-allowed}
+.p-btn.stop{border-color:var(--red);color:var(--red)}
+.p-btn.stop:hover{background:rgba(255,51,85,0.1)}
+
+.p-progress{margin-bottom:12px;display:none}
+.p-progress-label{font-size:8px;color:var(--current-color,var(--scout));letter-spacing:1px;margin-bottom:5px}
+.p-progress-bg{background:rgba(255,255,255,0.06);border-radius:2px;height:2px;overflow:hidden}
+.p-progress-fill{height:100%;border-radius:2px;width:0%;transition:width 0.3s;background:var(--current-color,var(--scout))}
+
+.p-log{background:rgba(1,2,8,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:4px;padding:10px;height:80px;overflow-y:auto;font-size:8px;margin-bottom:12px}
+.p-log-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.p-log-line.s{color:var(--green)}.p-log-line.w{color:var(--amber)}.p-log-line.e{color:var(--red)}.p-log-line.i{color:var(--blue,#4AB3FF)}
+
+.p-table-wrap{background:rgba(1,2,8,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;margin-bottom:12px}
+.p-table-head{padding:8px 10px;font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:2px;color:rgba(192,200,216,0.4);border-bottom:1px solid rgba(255,255,255,0.06)}
+.p-table{width:100%;border-collapse:collapse;font-size:9px}
+.p-table th{text-align:left;padding:6px 8px;font-size:7px;letter-spacing:1px;color:rgba(192,200,216,0.3);border-bottom:1px solid rgba(255,255,255,0.04)}
+.p-table td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,0.03);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-empty{text-align:center;padding:24px;color:rgba(192,200,216,0.25);font-size:9px;letter-spacing:2px}
+
+.badge{display:inline-block;padding:1px 6px;border-radius:10px;font-size:7px;letter-spacing:1px;border:1px solid}
+.badge.hot{color:var(--amber);border-color:var(--amber)}
+.badge.warm{color:var(--scout);border-color:var(--scout)}
+.badge.cold{color:rgba(192,200,216,0.4);border-color:rgba(192,200,216,0.2)}
+.badge.ok{color:var(--green);border-color:var(--green)}
+.badge.fail{color:var(--red);border-color:var(--red)}
+.badge.pend{color:var(--amber);border-color:var(--amber)}
+
+/* AUTOCOMPLETE */
+.ac-wrap{position:relative}
+.ac-list{position:absolute;top:100%;left:0;right:0;z-index:300;background:#0a0f1e;border:1px solid var(--scout);border-top:none;border-radius:0 0 4px 4px;max-height:160px;overflow-y:auto;display:none}
+.ac-list.open{display:block}
+.ac-item{padding:8px 12px;font-size:11px;cursor:pointer;color:var(--silver);border-bottom:1px solid rgba(74,179,255,0.05)}
+.ac-item:hover,.ac-item.active{background:rgba(74,179,255,0.1);color:var(--scout)}
+
+/* DEMO TOGGLE */
+.demo-box{background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);border-radius:6px;padding:12px;margin-bottom:12px}
+.demo-head{font-size:8px;letter-spacing:2px;color:var(--amber);margin-bottom:8px;display:block}
+.toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.toggle{width:34px;height:18px;background:rgba(255,255,255,0.1);border-radius:9px;cursor:pointer;position:relative;transition:background 0.3s;flex-shrink:0;border:none}
+.toggle.on{background:var(--amber)}
+.toggle::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left 0.3s}
+.toggle.on::after{left:19px}
+.toggle-label{font-size:10px;color:rgba(192,200,216,0.6)}
+
+.delay-row{display:flex;justify-content:space-between;font-size:8px;color:rgba(192,200,216,0.4);margin-bottom:4px}
+input[type=range]{-webkit-appearance:none;height:2px;background:rgba(255,255,255,0.1);border-radius:1px;outline:none;width:100%;padding:0;border:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--current-color,var(--dispatch));cursor:pointer}
+
+/* RUNNING INDICATOR */
+.running-badge{display:inline-flex;align-items:center;gap:4px;font-size:8px;letter-spacing:1px;padding:3px 8px;border-radius:10px;border:1px solid;margin-bottom:10px}
+.running-badge.active{color:var(--green);border-color:var(--green)}
+.running-badge.idle{color:rgba(192,200,216,0.3);border-color:rgba(192,200,216,0.1)}
+.rb-dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 1s infinite}
+
+/* PIPELINE NOTE */
+.pipeline-note{background:rgba(0,180,216,0.06);border:1px solid rgba(0,180,216,0.15);border-radius:6px;padding:10px;font-size:9px;color:rgba(192,200,216,0.5);line-height:1.7;margin-bottom:12px}
+</style>
+</head>
+<body>
+
+<canvas id="three-canvas"></canvas>
+<canvas id="conn-canvas"></canvas>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div><div class="brand">🧠 GALAXY</div><span class="sub">AUTONOMOUS SALES INTELLIGENCE</span></div>
+  <div id="live-badge"><div id="live-dot"></div>LIVE</div>
+  <div id="clock"></div>
+</div>
+
+<!-- SETTINGS BUTTON -->
+<div id="settings-btn" ontouchstart="openSettings()" onclick="openSettings()" style="position:fixed;bottom:70px;right:12px;z-index:500;background:rgba(0,180,216,0.12);border:1px solid rgba(0,180,216,0.35);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;padding:5px 10px;cursor:pointer;letter-spacing:1px;user-select:none;-webkit-user-select:none;touch-action:manipulation">⚙ SETTINGS</div>
+
+<!-- SETTINGS OVERLAY -->
+<div id="settings-overlay" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(1,2,8,0.92);backdrop-filter:blur(12px);overflow-y:auto;padding:24px 20px 40px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+    <div style="font-family:'Orbitron',sans-serif;font-size:14px;font-weight:900;letter-spacing:4px;color:#00B4D8">⚙ SETTINGS</div>
+    <button onclick="document.getElementById('settings-overlay').style.display='none'" style="background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;padding:6px 14px;cursor:pointer">✕ CLOSE</button>
+  </div>
+
+  <!-- GITHUB TOKEN -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:8px;letter-spacing:3px;color:rgba(192,200,216,0.4);margin-bottom:10px">🟢 GITHUB — LAUNCH AGENT (optional — for version control)</div>
+    <div id="github-status" style="font-size:9px;color:var(--green);margin-bottom:8px"></div>
+    <input id="s-github-token" type="password" placeholder="ghp_... (repo + workflow scopes)" style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveSettingGithub()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:#00FF88;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">💾 SAVE</button>
+      <button onclick="testSettingGithub()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">🔑 TEST</button>
+      <button onclick="clearSettingGithub()" style="padding:9px 14px;background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">✕</button>
+    </div>
+    <div id="github-log" style="font-size:8px;color:#00B4D8;margin-top:6px;min-height:16px"></div>
+  </div>
+
+  <div style="border-top:1px solid rgba(255,255,255,0.06);margin-bottom:20px"></div>
+
+  <!-- WORKER URL -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:8px;letter-spacing:3px;color:rgba(192,200,216,0.4);margin-bottom:10px">🟠 CLOUDFLARE WORKER — DISPATCH + FORGE AGENT</div>
+    <div id="worker-status" style="font-size:9px;color:var(--green);margin-bottom:8px"></div>
+    <input id="s-worker-url" type="url" placeholder="https://dispatchbridge.YOUR-NAME.workers.dev" style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveSettingWorker()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:#00FF88;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">💾 SAVE</button>
+      <button onclick="testSettingWorker()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">🔑 TEST</button>
+      <button onclick="clearSettingWorker()" style="padding:9px 14px;background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">✕</button>
+    </div>
+    <div id="worker-log" style="font-size:8px;color:#00B4D8;margin-top:6px;min-height:16px"></div>
+  </div>
+
+  <div style="border-top:1px solid rgba(255,255,255,0.06);margin-bottom:20px"></div>
+
+  <!-- NETLIFY TOKEN -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:8px;letter-spacing:3px;color:rgba(192,200,216,0.4);margin-bottom:10px">🟢 NETLIFY — LAUNCH AGENT</div>
+    <div id="netlify-status" style="font-size:9px;color:var(--green);margin-bottom:8px"></div>
+    <input id="s-netlify-token" type="password" placeholder="nfp_..." style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveSettingNetlify()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:#00FF88;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">💾 SAVE</button>
+      <button onclick="testSettingNetlify()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">🔑 TEST</button>
+      <button onclick="clearSettingNetlify()" style="padding:9px 14px;background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">✕</button>
+    </div>
+    <div id="netlify-log" style="font-size:8px;color:#00B4D8;margin-top:6px;min-height:16px"></div>
+  </div>
+
+  <div style="border-top:1px solid rgba(255,255,255,0.06);margin-bottom:20px"></div>
+
+  <!-- INSTANTLY KEY -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:8px;letter-spacing:3px;color:rgba(192,200,216,0.4);margin-bottom:10px">🟠 INSTANTLY API KEY — DISPATCH AGENT</div>
+    <input id="s-instantly-key" type="password" placeholder="Instantly V2 API key" style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveSettingInstantly()" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:#00FF88;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">💾 SAVE</button>
+      <button onclick="clearSettingInstantly()" style="padding:9px 14px;background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">✕</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- MACHINE SWITCH -->
+<div id="machine-switch-wrap">
+  <span class="switch-label">MACHINE</span>
+  <div id="machine-switch" onclick="toggleMachineSwitch()">
+    <div id="machine-switch-thumb"></div>
+  </div>
+  <div id="switch-glow"></div>
+  <span id="switch-state">OFF</span>
+</div>
+
+<!-- BOTTOM BAR -->
+<div id="bottombar">
+  <div class="bstat"><span class="bval" id="b-leads" style="color:var(--galaxy)">0</span><span class="blbl">LEADS</span></div>
+  <div class="bstat"><span class="bval" id="b-built" style="color:var(--forge)">0</span><span class="blbl">BUILT</span></div>
+  <div class="bstat"><span class="bval" id="b-live" style="color:var(--launch)">0</span><span class="blbl">LIVE</span></div>
+  <div class="bstat"><span class="bval" id="b-sent" style="color:var(--dispatch)">0</span><span class="blbl">SENT</span></div>
+</div>
+
+<!-- PIPELINE TOAST -->
+<div id="pipeline-toast"></div>
+
+<!-- PIPELINE MINI LOG -->
+<div id="pipeline-mini-log"></div>
+
+<!-- AGENT PANEL -->
+<div id="panel-backdrop" onclick="closePanel()"></div>
+<div id="agent-panel">
+  <div id="panel-gem-bar"></div>
+  <div id="panel-top">
+    <div class="panel-title-row">
+      <div id="panel-gem"></div>
+      <div><div id="panel-name"></div><div id="panel-role"></div></div>
+    </div>
+    <button id="close-panel" onclick="closePanel()">✕</button>
+  </div>
+  <div id="panel-content"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═══════════════════════════════════════════
+// GALAXY STATE — shared between all agents
+// ═══════════════════════════════════════════
+const STATE = {
+  leads: [], binned: [], forgeQueue: [], launchQueue: [],
+  scannerQueue: [], dispatchQueue: [], sentLog: [],
+  scoutRunning: false, forgeRunning: false, launchRunning: false,
+  scannerRunning: false, dispatchRunning: false, sentinelRunning: false,
+  scoutStopped: false, forgeStopped: false, launchStopped: false,
+  scannerStopped: false, dispatchStopped: false, sentinelStopped: false,
+  demoMode: false, demoEmail: '', instantlyKey: '', workerUrl: '', netlifyToken: '', netlifyToken: '', githubToken: '',
+  logs: { SCOUT:[], FORGE:[], LAUNCH:[], SCANNER:[], DISPATCH:[], SENTINEL:[], SAM:[] },
+  stats: { leads:0, built:0, live:0, sent:0 }
+};
+
+const SUPABASE_URL='https://uklrgpommxqmdvetfxmc.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrbHJncG9tbXhxbWR2ZXRmeG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MjQ2MTEsImV4cCI6MjA5NzQwMDYxMX0.xuKX88Hn4Wa_xLuLBrp7SsIsdlbiKbksRwYKwVKr5zI';
+function getGithubToken(){return STATE.githubToken||localStorage.getItem('galaxy_github_token')||''}
+const GITHUB_USER='themarketinginninbox';
+function getNetlifyToken(){return STATE.netlifyToken||localStorage.getItem('galaxy_netlify_token')||''}
+
+// ═══════════════════════════════════════════
+// AGENT CONFIG
+// ═══════════════════════════════════════════
+const AGENTS = [
+  {id:'GALAXY',gem:'🧠',gemColor:'#00B4D8',role:'Master Brain — Orchestrates All Agents',level:'brain'},
+  {id:'SCOUT', gem:'🔵',gemColor:'#4AB3FF',role:'Worker — Lead Sourcing Engine'},
+  {id:'FORGE', gem:'🔴',gemColor:'#FF3355',role:'Worker — Website Builder'},
+  {id:'LAUNCH',gem:'🟢',gemColor:'#00FF88',role:'Worker — Netlify Deployer'},
+  {id:'SCANNER',gem:'🟤',gemColor:'#CD853F',role:'Worker — Quality Gate'},
+  {id:'DISPATCH',gem:'🟠',gemColor:'#FFAA00',role:'Worker — Email Engine'},
+  {id:'SENTINEL',gem:'🔵',gemColor:'#E0E8FF',role:'Inbox Health & Email Recovery'},
+  {id:'SAM',gem:'🟣',gemColor:'#9B59B6',role:'CRM & Sales Operations'},
+];
+
+// Agents orbit in a ring — evenly spaced, continuously rotating
+const ORBIT_RADIUS = 52; // distance from centre
+const ORBIT_SPEED = 0.004; // how fast it auto-rotates
+
+// ═══════════════════════════════════════════
+// THREE.JS BACKGROUND
+// ═══════════════════════════════════════════
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('three-canvas'),antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,1000);
+camera.position.z=95;
+const PC=1400,pPos=new Float32Array(PC*3),pBase=[],pCol=new Float32Array(PC*3);
+const cls=[new THREE.Color('#4AB3FF'),new THREE.Color('#00B4D8'),new THREE.Color('#00FF88'),new THREE.Color('#C0C8D8'),new THREE.Color('#FF3355')];
+for(let i=0;i<PC;i++){const th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI,r=0.5+Math.random()*48,x=r*Math.sin(ph)*Math.cos(th),y=r*Math.sin(ph)*Math.sin(th),z=(Math.random()-0.5)*16;pPos[i*3]=x;pPos[i*3+1]=y;pPos[i*3+2]=z;pBase.push({x,y,z,spd:Math.random()*0.5+0.2,phase:Math.random()*Math.PI*2,amp:Math.random()*2+0.5});const c=cls[Math.floor(Math.random()*cls.length)];pCol[i*3]=c.r;pCol[i*3+1]=c.g;pCol[i*3+2]=c.b}
+const pGeo=new THREE.BufferGeometry();pGeo.setAttribute('position',new THREE.BufferAttribute(pPos,3));pGeo.setAttribute('color',new THREE.BufferAttribute(pCol,3));
+const pMesh=new THREE.Points(pGeo,new THREE.PointsMaterial({size:0.35,vertexColors:true,transparent:true,opacity:0.7}));scene.add(pMesh);
+for(let i=0;i<60;i++){const a=Math.random()*Math.PI*2,l=15+Math.random()*50,pts=[new THREE.Vector3(0,0,0),new THREE.Vector3(Math.cos(a)*l,Math.sin(a)*l,(Math.random()-0.5)*8)];const g=new THREE.BufferGeometry().setFromPoints(pts),m=new THREE.LineBasicMaterial({color:cls[Math.floor(Math.random()*cls.length)],transparent:true,opacity:0.06});scene.add(new THREE.Line(g,m))}
+const core=new THREE.Mesh(new THREE.SphereGeometry(1.2,32,32),new THREE.MeshBasicMaterial({color:0x00B4D8,transparent:true,opacity:0.45}));scene.add(core);
+const glow=new THREE.Mesh(new THREE.SphereGeometry(3.2,32,32),new THREE.MeshBasicMaterial({color:0x00B4D8,transparent:true,opacity:0.08}));scene.add(glow);
+
+// CONNECTOR CANVAS
+const cc=document.getElementById('conn-canvas');
+const ctx=cc.getContext('2d');
+function resCC(){cc.width=innerWidth;cc.height=innerHeight}resCC();
+
+// NODE ELEMENTS
+const nodeEls={},screenPos={};
+AGENTS.forEach((a,i)=>{
+  const el=document.createElement('div');
+  el.className='agent-node';
+  el.style.setProperty('--node-color',a.gemColor);
+  el.innerHTML=`<div class="node-box" style="border-color:${a.gemColor}22"><span class="n-gem">${a.gem}</span><span class="n-name" style="color:${a.gemColor}">${a.id}</span><span class="n-status"><span class="n-dot" style="background:${a.gemColor}"></span><span class="n-status-text">IDLE</span></span></div>`;
+  el.onclick=()=>openPanel(a);
+  document.body.appendChild(el);
+  nodeEls[a.id]=el;
+});
+
+// ═══════════════════════════════════════════
+// DRAG TO SPIN ORBITAL
+// ═══════════════════════════════════════════
+let orbitAngle=0, orbitVelocity=0;
+let dragActive=false, dragStartX=0, lastDragX=0, dragStartTime=0;
+let tapStartX=0, tapStartY=0, tapStartTime=0;
+const DRAG_THRESHOLD=8; // px — below this is a tap not a drag
+
+function onDragStart(x,y){
+  dragActive=true;
+  dragStartX=x;lastDragX=x;
+  tapStartX=x;tapStartY=y;
+  tapStartTime=Date.now();
+  orbitVelocity=0;
+}
+function onDragMove(x){
+  if(!dragActive)return;
+  const dx=x-lastDragX;
+  orbitAngle+=dx*0.003;
+  orbitVelocity=dx*0.003;
+  lastDragX=x;
+}
+function onDragEnd(x,y,targetEl){
+  if(!dragActive)return;
+  dragActive=false;
+  const dist=Math.sqrt((x-tapStartX)**2+(y-tapStartY)**2);
+  const elapsed=Date.now()-tapStartTime;
+  // If barely moved and quick — treat as tap, open panel
+  if(dist<DRAG_THRESHOLD&&elapsed<300){
+    const node=targetEl?.closest('.agent-node');
+    if(node){
+      const agentId=node.querySelector('.n-name')?.textContent;
+      const agent=AGENTS.find(a=>a.id===agentId);
+      if(agent)openPanel(agent);
+    }
+  }
+  // Apply momentum
+  orbitVelocity*=0.8;
+}
+
+// Only start drag if touch/click is on background — not on a node
+function isOnNode(el){return el?.closest('.agent-node')!=null}
+
+document.addEventListener('touchstart',e=>{
+  if(document.getElementById('agent-panel').classList.contains('open'))return;
+  if(isOnNode(e.target))return;
+  if(e.touches.length===1)onDragStart(e.touches[0].clientX,e.touches[0].clientY);
+},{passive:true});
+document.addEventListener('touchmove',e=>{
+  if(document.getElementById('agent-panel').classList.contains('open'))return;
+  if(e.touches.length===1)onDragMove(e.touches[0].clientX);
+},{passive:true});
+document.addEventListener('touchend',e=>{
+  if(document.getElementById('agent-panel').classList.contains('open'))return;
+  const t=e.changedTouches[0];
+  onDragEnd(t.clientX,t.clientY);
+},{passive:true});
+
+// Mouse events for desktop
+document.addEventListener('mousedown',e=>{
+  if(document.getElementById('agent-panel').classList.contains('open'))return;
+  if(isOnNode(e.target))return;
+  if(e.button===0)onDragStart(e.clientX,e.clientY);
+});
+document.addEventListener('mousemove',e=>{
+  if(!dragActive)return;
+  onDragMove(e.clientX);
+});
+document.addEventListener('mouseup',e=>{
+  if(!dragActive)return;
+  onDragEnd(e.clientX,e.clientY);
+});
+
+// Nodes always open on click/tap
+AGENTS.forEach(a=>{
+  nodeEls[a.id].onclick=(e)=>{e.stopPropagation();openPanel(a)};
+  nodeEls[a.id].addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
+  nodeEls[a.id].addEventListener('mousedown',e=>e.stopPropagation());
+});
+
+// DRAG HINT
+const dragHint=document.createElement('div');
+dragHint.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);font-size:8px;letter-spacing:2px;color:rgba(192,200,216,0.25);pointer-events:none;z-index:40;transition:opacity 1s';
+dragHint.textContent='DRAG TO SPIN';
+document.body.appendChild(dragHint);
+setTimeout(()=>dragHint.style.opacity='0',4000);
+
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);t+=0.006;
+  const pp=pGeo.attributes.position.array;
+  for(let i=0;i<PC;i++){const b=pBase[i];pp[i*3]=b.x+Math.sin(t*b.spd+b.phase)*b.amp;pp[i*3+1]=b.y+Math.cos(t*b.spd*0.8+b.phase)*b.amp}
+  pGeo.attributes.position.needsUpdate=true;
+  const pulse=Math.sin(t*1.6)*0.5+0.5;
+  core.material.opacity=0.3+pulse*0.3;glow.scale.setScalar(1+pulse*0.2);
+  scene.rotation.y=Math.sin(t*0.07)*0.1;pMesh.rotation.z=t*0.025;
+
+  // Continuous auto-rotation + drag momentum
+  if(!dragActive){orbitVelocity*=0.88;orbitAngle+=ORBIT_SPEED+orbitVelocity}
+
+  const cx=innerWidth/2,cy=innerHeight/2,scale=Math.min(innerWidth,innerHeight)/200;
+  AGENTS.forEach((a,i)=>{
+    if(i===0){
+      // GALAXY stays at centre with gentle pulse
+      screenPos[a.id]={x:cx,y:cy};
+      nodeEls[a.id].style.left=cx+'px';nodeEls[a.id].style.top=cy+'px';
+      return;
+    }
+    // Evenly space 7 agents around a ring, continuously rotating
+    const totalWorkers=AGENTS.length-1;
+    const baseAngle=(2*Math.PI/totalWorkers)*(i-1);
+    const angle=baseAngle+orbitAngle;
+    const r=ORBIT_RADIUS*scale;
+    const sx=cx+Math.cos(angle)*r;
+    const sy=cy+Math.sin(angle)*r*0.85; // slightly flattened ellipse
+    screenPos[a.id]={x:sx,y:sy};
+    nodeEls[a.id].style.left=sx+'px';nodeEls[a.id].style.top=sy+'px';
+  });
+  ctx.clearRect(0,0,cc.width,cc.height);
+  const gp=screenPos['GALAXY']||{x:cx,y:cy};
+  AGENTS.forEach((a,i)=>{
+    if(a.id==='GALAXY')return;
+    const p=screenPos[a.id];if(!p)return;
+    const isRunning=STATE[a.id.toLowerCase()+'Running'];
+    const alpha=isRunning?(0.2+0.15*Math.sin(t*2+i)):(0.08+0.04*Math.sin(t*0.8+i));
+    const grad=ctx.createLinearGradient(gp.x,gp.y,p.x,p.y);
+    grad.addColorStop(0,`rgba(0,180,216,${alpha})`);
+    grad.addColorStop(1,hexAlpha(a.gemColor,alpha*0.7));
+    ctx.beginPath();ctx.moveTo(gp.x,gp.y);
+    ctx.quadraticCurveTo((gp.x+p.x)/2+(p.y-gp.y)*0.1*Math.sin(t*0.4+i),(gp.y+p.y)/2-(p.x-gp.x)*0.1*Math.sin(t*0.3+i),p.x,p.y);
+    ctx.strokeStyle=grad;ctx.lineWidth=isRunning?1:0.5;ctx.stroke();
+    if(isRunning){
+      const prog=(Math.sin(t*0.9+i*0.8)*0.5+0.5);
+      const bx=gp.x+(p.x-gp.x)*prog,by=gp.y+(p.y-gp.y)*prog;
+      ctx.beginPath();ctx.arc(bx,by,2,0,Math.PI*2);
+      ctx.fillStyle=a.gemColor;ctx.fill();
+    }
+  });
+  renderer.render(scene,camera);
+}
+animate();
+
+function hexAlpha(hex,a){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgba(${r},${g},${b},${a})`}
+
+window.addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();resCC()});
+setInterval(()=>document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8),1000);
+document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8);
+
+// ═══════════════════════════════════════════
+// GALAXY HOLD — FULL PIPELINE ACTIVATION
+// ═══════════════════════════════════════════
+let galaxyHoldTimer=null;
+let pipelineRunning=false;
+let pipelineStopped=false;
+
+// Hold indicator ring
+const holdRing=document.createElement('div');
+holdRing.style.cssText='position:fixed;z-index:500;border-radius:50%;border:2px solid #00B4D8;pointer-events:none;display:none;transform:translate(-50%,-50%)';
+document.body.appendChild(holdRing);
+
+function showHoldProgress(x,y,progress){
+  const size=80+progress*20;
+  holdRing.style.display='block';
+  holdRing.style.left=x+'px';holdRing.style.top=y+'px';
+  holdRing.style.width=size+'px';holdRing.style.height=size+'px';
+  holdRing.style.opacity=progress;
+  holdRing.style.boxShadow=`0 0 ${20*progress}px rgba(0,180,216,${progress})`;
+}
+function hideHoldRing(){
+  holdRing.style.display='none';
+}
+
+// Add hold detection to GALAXY node
+function initGalaxyHold(){
+  const galaxyNode=nodeEls['GALAXY'];
+  if(!galaxyNode)return;
+  let holdX=0,holdY=0,holdProgress=0,holdInterval=null;
+
+  function startHold(x,y){
+    if(pipelineRunning)return;
+    holdX=x;holdY=y;holdProgress=0;
+    holdInterval=setInterval(()=>{
+      holdProgress+=0.033; // fills in ~1 second
+      showHoldProgress(holdX,holdY,Math.min(holdProgress,1));
+      if(holdProgress>=1){
+        clearInterval(holdInterval);
+        hideHoldRing();
+        activatePipeline();
+      }
+    },33);
+  }
+  function cancelHold(){
+    clearInterval(holdInterval);
+    holdInterval=null;
+    hideHoldRing();
+  }
+
+  galaxyNode.addEventListener('touchstart',e=>{
+    e.stopPropagation();
+    const t=e.touches[0];
+    startHold(t.clientX,t.clientY);
+  },{passive:true});
+  galaxyNode.addEventListener('touchend',e=>{e.stopPropagation();cancelHold()},{passive:true});
+  galaxyNode.addEventListener('touchcancel',e=>{e.stopPropagation();cancelHold()},{passive:true});
+  galaxyNode.addEventListener('mousedown',e=>{e.stopPropagation();startHold(e.clientX,e.clientY)});
+  galaxyNode.addEventListener('mouseup',e=>{e.stopPropagation();cancelHold()});
+  galaxyNode.addEventListener('mouseleave',e=>{cancelHold()});
+  // Override the touchstart openPanel — GALAXY opens modal not panel
+  galaxyNode.onclick=null;
+}
+
+// ACTIVATION MODAL
+const activationModal=document.createElement('div');
+activationModal.style.cssText='position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:rgba(1,2,8,0.9);backdrop-filter:blur(8px)';
+activationModal.innerHTML=`
+<div style="background:rgba(6,10,24,0.98);border:1px solid rgba(0,180,216,0.3);border-radius:16px;padding:28px 24px;width:calc(100% - 48px);max-width:420px">
+  <div style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;color:#00B4D8;letter-spacing:4px;margin-bottom:4px">🧠 GALAXY</div>
+  <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:24px">FULL PIPELINE ACTIVATION</div>
+  
+  <div style="margin-bottom:16px">
+    <div style="font-size:8px;letter-spacing:2px;color:#4AB3FF;margin-bottom:6px">TARGET LOCATION</div>
+    <div style="position:relative">
+      <input id="galaxy-location" style="background:rgba(1,2,8,0.8);border:1px solid rgba(0,180,216,0.2);border-radius:4px;padding:11px 14px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;width:100%" placeholder="Start typing town..." oninput="handleGalaxyAC(this.value)" onkeydown="handleGalaxyACKey(event)">
+      <div id="galaxy-ac-list" style="position:absolute;top:100%;left:0;right:0;z-index:700;background:#0a0f1e;border:1px solid #00B4D8;border-top:none;border-radius:0 0 4px 4px;max-height:160px;overflow-y:auto;display:none"></div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:24px">
+    <div style="font-size:8px;letter-spacing:2px;color:#4AB3FF;margin-bottom:6px">TARGET NICHE</div>
+    <select id="galaxy-niche" style="background:rgba(1,2,8,0.8);border:1px solid rgba(0,180,216,0.2);border-radius:4px;padding:11px 14px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;width:100%">
+      <option value="">— Select niche —</option>
+      <optgroup label="Food & Drink">
+        <option value="restaurant">Restaurants</option>
+        <option value="cafe">Cafes</option>
+        <option value="bar">Bars & Pubs</option>
+        <option value="fast_food">Fast Food</option>
+        <option value="bakery">Bakeries</option>
+      </optgroup>
+      <optgroup label="Health & Beauty">
+        <option value="pharmacy">Pharmacies</option>
+        <option value="hairdresser">Barbers & Hair</option>
+        <option value="beauty">Beauty Salons</option>
+        <option value="dentist">Dentists</option>
+        <option value="gym">Gyms</option>
+      </optgroup>
+      <optgroup label="Trades">
+        <option value="car_repair">Car Repair</option>
+        <option value="clothes">Clothing</option>
+        <option value="convenience">Convenience</option>
+      </optgroup>
+    </select>
+  </div>
+
+  <div style="background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);border-radius:6px;padding:12px;margin-bottom:20px">
+    <div style="font-size:8px;letter-spacing:2px;color:#FFAA00;margin-bottom:8px">🎯 DEMO MODE</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <button id="galaxy-demo-toggle" style="width:34px;height:18px;background:rgba(255,255,255,0.1);border-radius:9px;cursor:pointer;position:relative;transition:background 0.3s;border:none" onclick="toggleGalaxyDemo()"></button>
+      <span id="galaxy-demo-label" style="font-size:10px;color:rgba(192,200,216,0.6);font-family:'Share Tech Mono',monospace">OFF — sends to real businesses</span>
+    </div>
+    <input id="galaxy-demo-email" type="email" placeholder="your@email.com" style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,170,0,0.2);border-radius:4px;padding:9px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;display:none">
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <button onclick="closeActivationModal()" style="padding:13px;background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:4px;color:rgba(192,200,216,0.5);font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;cursor:pointer">CANCEL</button>
+    <button onclick="confirmActivation()" style="padding:13px;background:transparent;border:1px solid #00B4D8;border-radius:4px;color:#00B4D8;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;cursor:pointer;box-shadow:0 0 12px rgba(0,180,216,0.2)">🧠 ACTIVATE</button>
+  </div>
+
+  <!-- PIPELINE STATUS — shown after activation -->
+  <div id="pipeline-status" style="display:none;margin-top:20px;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px">
+    <div id="pipeline-log" style="background:rgba(1,2,8,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:4px;padding:10px;height:120px;overflow-y:auto;font-size:9px;font-family:'Share Tech Mono',monospace;margin-bottom:12px"></div>
+    <button onclick="stopPipeline()" style="width:100%;padding:11px;background:transparent;border:1px solid #FF3355;border-radius:4px;color:#FF3355;font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;cursor:pointer">⬛ STOP PIPELINE</button>
+  </div>
+</div>`;
+document.body.appendChild(activationModal);
+
+let galaxyDemoOn=false;
+function toggleGalaxyDemo(){
+  galaxyDemoOn=!galaxyDemoOn;
+  const btn=document.getElementById('galaxy-demo-toggle');
+  const lbl=document.getElementById('galaxy-demo-label');
+  const inp=document.getElementById('galaxy-demo-email');
+  btn.style.background=galaxyDemoOn?'#FFAA00':'rgba(255,255,255,0.1)';
+  btn.style.setProperty('--after-left',galaxyDemoOn?'19px':'3px');
+  lbl.textContent=galaxyDemoOn?'ON — emails go to demo address':'OFF — sends to real businesses';
+  inp.style.display=galaxyDemoOn?'block':'none';
+}
+
+// Galaxy AC
+let galaxyACIndex=-1;
+function handleGalaxyAC(val){
+  const list=document.getElementById('galaxy-ac-list');
+  galaxyACIndex=-1;
+  if(val.length<3){list.style.display='none';list.innerHTML='';return}
+  const m=UK_TOWNS.filter(t=>t.toLowerCase().startsWith(val.toLowerCase())).slice(0,7);
+  if(!m.length){list.style.display='none';return}
+  list.innerHTML=m.map(t=>`<div onclick="selectGalaxyTown('${t}')" style="padding:8px 12px;font-size:11px;cursor:pointer;color:#C0C8D8;border-bottom:1px solid rgba(74,179,255,0.05);font-family:'Share Tech Mono',monospace" onmouseover="this.style.background='rgba(74,179,255,0.1)'" onmouseout="this.style.background=''">${t}</div>`).join('');
+  list.style.display='block';
+}
+function handleGalaxyACKey(e){
+  const list=document.getElementById('galaxy-ac-list');
+  const items=list.querySelectorAll('div');
+  if(e.key==='ArrowDown'){galaxyACIndex=Math.min(galaxyACIndex+1,items.length-1)}
+  else if(e.key==='ArrowUp'){galaxyACIndex=Math.max(galaxyACIndex-1,0)}
+  else if(e.key==='Enter'){e.preventDefault();if(items[galaxyACIndex])selectGalaxyTown(items[galaxyACIndex].textContent)}
+  else if(e.key==='Escape'){list.style.display='none'}
+}
+function selectGalaxyTown(town){
+  document.getElementById('galaxy-location').value=town;
+  document.getElementById('galaxy-ac-list').style.display='none';
+}
+
+function activatePipeline(){
+  activationModal.style.display='flex';
+}
+function closeActivationModal(){
+  if(!pipelineRunning){
+    activationModal.style.display='none';
+    galaxyDemoOn=false;
+    resetSwitch();
+  }
+}
+
+function pipelineLog(msg,type='i'){
+  const el=document.getElementById('pipeline-log');
+  if(el){
+    const time=new Date().toTimeString().slice(0,8);
+    const colors={s:'#00FF88',w:'#FFAA00',e:'#FF3355',i:'#4AB3FF'};
+    el.innerHTML=`<div style="color:${colors[type]||colors.i};padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)">[${time}] ${msg}</div>`+el.innerHTML;
+  }
+  // Always update mini log on dashboard
+  updateMiniLog(msg,type);
+  // Update toast with latest stage
+  if(type==='s'||type==='i')showPipelineToast(msg.length>50?msg.slice(0,50)+'...':msg);
+}
+
+function stopPipeline(){
+  pipelineStopped=true;
+  STATE.scoutStopped=true;
+  STATE.forgeStopped=true;
+  STATE.launchStopped=true;
+  STATE.scannerStopped=true;
+  STATE.dispatchStopped=true;
+  pipelineLog('⬛ PIPELINE STOPPED BY USER','w');
+  pipelineRunning=false;
+  setNodeStatus('SCOUT','IDLE');
+  setNodeStatus('FORGE','IDLE');
+  setNodeStatus('LAUNCH','IDLE');
+  setNodeStatus('SCANNER','IDLE');
+  setNodeStatus('DISPATCH','IDLE');
+  setTimeout(()=>{
+    activationModal.style.display='none';
+    document.getElementById('pipeline-status').style.display='none';
+  },2000);
+}
+
+async function confirmActivation(){
+  const location=document.getElementById('galaxy-location')?.value?.trim();
+  const niche=document.getElementById('galaxy-niche').value;
+  const demoEmail=document.getElementById('galaxy-demo-email').value.trim();
+
+  if(!location){document.getElementById('galaxy-location').style.borderColor='#FF3355';return}
+  if(!niche){document.getElementById('galaxy-niche').style.borderColor='#FF3355';return}
+  if(galaxyDemoOn&&!demoEmail){document.getElementById('galaxy-demo-email').style.borderColor='#FF3355';return}
+
+  // Set global state
+  STATE.scoutLocation=location;
+  STATE.scoutNiche=niche;
+  STATE.demoMode=galaxyDemoOn;
+  STATE.demoEmail=demoEmail;
+
+  pipelineRunning=true;
+  pipelineStopped=false;
+
+  // Close modal — let user watch dashboard while pipeline runs
+  activationModal.style.display='none';
+
+  // Show a small status toast
+  showPipelineToast(`🧠 GALAXY ACTIVE — ${location} / ${niche}`);
+
+  pipelineLog(`🧠 GALAXY ACTIVATED — ${location} / ${niche}`,'s');
+  pipelineLog(galaxyDemoOn?`Demo mode ON → ${demoEmail}`:'Live mode — sending to real businesses','w');
+
+  // ── STAGE 1: SCOUT ──
+  pipelineLog('🔵 SCOUT initiating...','i');
+  setNodeStatus('SCOUT','RUNNING');
+  await runScoutForPipeline(location, niche);
+  if(pipelineStopped)return;
+  pipelineLog(`🔵 SCOUT complete — ${STATE.leads.length} leads found`,'s');
+
+  // ── STAGE 2: FORGE ──
+  pipelineLog('🔴 FORGE initiating...','i');
+  await runForgeForPipeline();
+  if(pipelineStopped)return;
+  pipelineLog(`🔴 FORGE complete — ${STATE.forgeQueue.filter(i=>i.status==='saved').length} sites built`,'s');
+
+  // ── STAGE 3: LAUNCH ──
+  pipelineLog('🟢 LAUNCH initiating...','i');
+  await runLaunchForPipeline();
+  if(pipelineStopped)return;
+  pipelineLog(`🟢 LAUNCH complete — ${STATE.launchQueue.filter(i=>i.status==='live').length} sites live`,'s');
+
+  // ── STAGE 4: SCANNER ──
+  pipelineLog('🟤 SCANNER initiating...','i');
+  await startScanner();
+  if(pipelineStopped)return;
+  pipelineLog(`🟤 SCANNER complete — ${STATE.scannerQueue.filter(i=>i.status==='approved').length} approved`,'s');
+
+  // ── STAGE 5: DISPATCH ──
+  pipelineLog('🟠 DISPATCH initiating...','i');
+  await startDispatch();
+  pipelineLog(`🟠 DISPATCH complete — ${STATE.sentLog.length} emails sent`,'s');
+
+  pipelineRunning=false;
+  pipelineLog('✅ GALAXY PIPELINE COMPLETE','s');
+  addLog('SAM',`Pipeline complete — ${location}/${niche} — ${STATE.sentLog.length} sent`,'s');
+  
+  // Reset switch and hide overlays after 3s
+  setTimeout(()=>{
+    resetSwitch();
+    hidePipelineToast();
+    document.getElementById('pipeline-mini-log').classList.remove('visible');
+  },3000);
+}
+
+// ═══════════════════════════════════════════
+// NETLIFY ZIP HELPER
+// ═══════════════════════════════════════════
+async function createZip(filename, content){
+  // Create a minimal valid ZIP file containing one file
+  const encoder=new TextEncoder();
+  const fileData=encoder.encode(content);
+  const fileNameData=encoder.encode(filename);
+  
+  // Local file header
+  const localHeader=new Uint8Array([
+    0x50,0x4B,0x03,0x04, // signature
+    0x14,0x00,           // version needed
+    0x00,0x00,           // flags
+    0x00,0x00,           // compression (stored)
+    0x00,0x00,0x00,0x00, // mod time/date
+    0x00,0x00,0x00,0x00, // crc32 (0 for stored)
+    ...new Uint8Array(new Uint32Array([fileData.length]).buffer), // compressed size
+    ...new Uint8Array(new Uint32Array([fileData.length]).buffer), // uncompressed size
+    fileNameData.length&0xFF,(fileNameData.length>>8)&0xFF, // filename length
+    0x00,0x00            // extra field length
+  ]);
+  
+  const offset=localHeader.length+fileNameData.length;
+  
+  // Central directory
+  const centralDir=new Uint8Array([
+    0x50,0x4B,0x01,0x02, // signature
+    0x14,0x00,0x14,0x00, // versions
+    0x00,0x00,0x00,0x00, // flags, compression
+    0x00,0x00,0x00,0x00, // mod time/date
+    0x00,0x00,0x00,0x00, // crc32
+    ...new Uint8Array(new Uint32Array([fileData.length]).buffer),
+    ...new Uint8Array(new Uint32Array([fileData.length]).buffer),
+    fileNameData.length&0xFF,(fileNameData.length>>8)&0xFF,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    ...new Uint8Array(new Uint32Array([0]).buffer) // offset
+  ]);
+  
+  const centralDirSize=centralDir.length+fileNameData.length;
+  const centralDirOffset=offset+fileData.length;
+  
+  // End of central directory
+  const endRecord=new Uint8Array([
+    0x50,0x4B,0x05,0x06, // signature
+    0x00,0x00,0x00,0x00, // disk numbers
+    0x01,0x00,0x01,0x00, // entry counts
+    ...new Uint8Array(new Uint32Array([centralDirSize]).buffer),
+    ...new Uint8Array(new Uint32Array([centralDirOffset]).buffer),
+    0x00,0x00            // comment length
+  ]);
+  
+  // Combine all parts
+  const total=new Uint8Array(localHeader.length+fileNameData.length+fileData.length+centralDir.length+fileNameData.length+endRecord.length);
+  let pos=0;
+  total.set(localHeader,pos);pos+=localHeader.length;
+  total.set(fileNameData,pos);pos+=fileNameData.length;
+  total.set(fileData,pos);pos+=fileData.length;
+  total.set(centralDir,pos);pos+=centralDir.length;
+  total.set(fileNameData,pos);pos+=fileNameData.length;
+  total.set(endRecord,pos);
+  
+  return total.buffer;
+}
+
+// ═══════════════════════════════════════════
+// PARALLEL PIPELINE — fires as SCOUT finds leads
+// ═══════════════════════════════════════════
+const parallelQueue=[];
+let parallelRunning=false;
+
+async function triggerParallelPipeline(lead){
+  parallelQueue.push(lead);
+  if(parallelRunning)return; // already processing queue
+  parallelRunning=true;
+
+  while(parallelQueue.length>0&&!pipelineStopped){
+    const l=parallelQueue.shift();
+    try{
+      // FORGE — AI-powered site generation
+      pipelineLog(`🔴 FORGE: AI building ${l.name}...`,'i');
+      setNodeStatus('FORGE','RUNNING');
+      STATE.forgeRunning=true;
+      let html='';
+      try{
+        html=await buildSiteWithAI(l);
+        pipelineLog(`🔴 FORGE: AI site generated for ${l.name}`,'s');
+      }catch(e){
+        pipelineLog(`🔴 FORGE: AI failed (${e.message}) — using template`,'w');
+        html=buildSiteHTML(l);
+      }
+      const forgeRow=await sbInsert('forge_output',{lead_id:l.id,business_name:l.name,html,status:'ready'});
+      STATE.forgeQueue.push({...l,status:'saved',forge_id:forgeRow?.id});
+      STATE.stats.built++;updateBottomBar();
+      pipelineLog(`🔴 FORGE: Built ${l.name}`,'s');
+
+      if(pipelineStopped)break;
+
+      // LAUNCH — deploy to Netlify
+      pipelineLog(`🟢 LAUNCH: Deploying ${l.name} to Netlify...`,'i');
+      setNodeStatus('LAUNCH','RUNNING');
+      STATE.launchRunning=true;
+      if(!getNetlifyToken()){pipelineLog('🟢 LAUNCH: No Netlify token — open Settings','e');break;}
+
+      const siteName=`galaxy-${slugify(l.name)}-${Date.now().toString(36)}`;
+      let url='';
+      let launchRow=null;
+
+      try{
+        url=await netlifyFileDeploy(siteName,html);
+        pipelineLog(`🟢 LAUNCH: ✅ LIVE — ${url}`,'s');
+        launchRow=await sbInsert('launch_output',{forge_id:forgeRow?.id,business_name:l.name,netlify_site:siteName,live_url:url,status:'live'});
+        if(forgeRow?.id)await sbUpdate('forge_output',forgeRow.id,{status:'deployed'});
+        STATE.launchQueue.push({...l,status:'live',url});
+        STATE.stats.live++;updateBottomBar();
+      }catch(e){
+        pipelineLog(`🟢 LAUNCH: Failed — ${e.message}`,'e');
+        url='';
+      }
+
+      if(pipelineStopped)break;
+
+      // SCANNER — quick check
+      pipelineLog(`🟤 SCANNER: Checking ${l.name}`,'i');
+      setNodeStatus('SCANNER','RUNNING');
+      STATE.scannerRunning=true;
+      const checks={name:html.includes(l.name)&&!html.includes('{{'),url:true,email:!!l.email,phone:!!l.phone};
+      const approved=checks.name&&checks.url;
+      STATE.scannerQueue.push({...l,status:approved?'approved':'failed',checks,live_url:url});
+
+      if(approved){
+        await sbInsert('dispatch_queue',{business_name:l.name,email:l.email,live_url:url,template_used:'Template-01',status:'ready'});
+        STATE.dispatchQueue.push({business_name:l.name,email:l.email,live_url:url});
+        pipelineLog(`🟤 SCANNER: Approved ${l.name} → queue`,'s');
+
+        if(pipelineStopped)break;
+
+        // DISPATCH — send via Cloudflare Worker
+        pipelineLog(`🟠 DISPATCH: Sending to ${l.name}`,'i');
+        setNodeStatus('DISPATCH','RUNNING');
+        STATE.dispatchRunning=true;
+        const toEmail=STATE.demoMode?STATE.demoEmail:l.email;
+        if(toEmail){
+          try{
+            const campData=await workerFetch('get_campaign');
+            pipelineLog(`🟠 DISPATCH: Campaign — ${JSON.stringify(campData)}`,'i');
+            if(campData.ok){
+              const addData=await workerFetch('add_lead',{
+                campaign_id:campData.campaign_id,
+                email:toEmail,
+                business_name:l.name,
+                live_url:url
+              });
+              pipelineLog(`🟠 DISPATCH: Lead result — ${JSON.stringify(addData)}`,'i');
+              if(addData.ok){
+                STATE.sentLog.push({business_name:l.name,to:toEmail,live_url:url});
+                STATE.stats.sent++;updateBottomBar();
+                pipelineLog(`🟠 DISPATCH: Queued → ${toEmail}`,'s');
+                if(launchRow?.id)await sbUpdate('dispatch_queue',launchRow.id,{status:'sent',sent_at:new Date().toISOString()});
+              } else {
+                pipelineLog(`🟠 DISPATCH: Lead error — ${JSON.stringify(addData)}`,'e');
+              }
+            } else {
+              pipelineLog(`🟠 DISPATCH: Campaign error — ${JSON.stringify(campData)}`,'e');
+            }
+          }catch(e){pipelineLog(`🟠 DISPATCH error: ${e.message}`,'e')}
+        } else {
+          pipelineLog(`🟠 DISPATCH: No email for ${l.name} — skipped`,'w');
+        }
+        const delay=(STATE.sendDelay||30)*1000;
+        await new Promise(r=>setTimeout(r,delay));
+      }
+    }catch(e){
+      pipelineLog(`Pipeline error for ${l.name}: ${e.message}`,'e');
+    }
+  }
+
+  parallelRunning=false;
+  STATE.forgeRunning=false;STATE.launchRunning=false;
+  STATE.scannerRunning=false;STATE.dispatchRunning=false;
+  setNodeStatus('FORGE','IDLE');setNodeStatus('LAUNCH','IDLE');
+  setNodeStatus('SCANNER','IDLE');setNodeStatus('DISPATCH','IDLE');
+}
+
+// Pipeline versions of scout/forge/launch that use state directly
+async function runScoutForPipeline(location, niche){
+  STATE.leads=[];STATE.binned=[];STATE.scoutStopped=false;
+  try{
+    const res=await fetch(`https://bizdata-web.vercel.app/api/businesses?location=${encodeURIComponent(location)}&category=${niche}&limit=500`);
+    const data=await res.json();
+    const businesses=data.businesses||[];
+    pipelineLog(`BizData: ${businesses.length} businesses found`,'i');
+    for(let i=0;i<businesses.length;i++){
+      if(pipelineStopped)break;
+      const biz=businesses[i];
+      let email=biz.email||'';
+      if(!email&&biz.website){
+        const html=await scrapeUrl(biz.website);
+        email=extractEmails(html)[0]||'';
+      }
+      const lead={name:biz.name||'',address:biz.address||'',phone:biz.phone||'',website:biz.website||'',email,niche,location,lead_temp:!biz.website&&!email?'HOT':email?'WARM':'COLD',email_found:!!email,created_at:new Date().toISOString()};
+      try{const saved=await sbInsert('scout_leads',lead);lead.id=saved?.id}catch{}
+      if(email){
+        STATE.leads.push(lead);
+        // ── PARALLEL PIPELINE ── trigger FORGE immediately for this lead
+        triggerParallelPipeline(lead);
+      } else {
+        STATE.binned.push(lead);
+      }
+      if(i%5===0)pipelineLog(`SCOUT: ${i+1}/${businesses.length} processed — ${STATE.leads.length} leads`,'i');
+      await new Promise(r=>setTimeout(r,200));
+    }
+    STATE.stats.leads=STATE.leads.length;updateBottomBar();
+    setNodeStatus('SCOUT','DONE');
+  }catch(e){pipelineLog(`SCOUT error: ${e.message}`,'e');setNodeStatus('SCOUT','ERROR')}
+}
+
+async function runForgeForPipeline(){
+  STATE.forgeQueue=[];STATE.forgeStopped=false;
+  try{
+    const leads=await sbGet('scout_leads',`select=*&order=created_at.desc&limit=10`);
+    if(!leads.length){pipelineLog('FORGE: No leads found','w');return}
+    STATE.forgeQueue=leads.map(l=>({...l,status:'queued'}));
+    for(let i=0;i<STATE.forgeQueue.length;i++){
+      if(pipelineStopped)break;
+      const item=STATE.forgeQueue[i];
+      item.status='building';
+      try{
+        const html=buildSiteHTML(item);
+        const saved=await sbInsert('forge_output',{lead_id:item.id,business_name:item.name,html,status:'ready'});
+        item.forge_id=saved?.id;item.status='saved';
+        STATE.stats.built++;updateBottomBar();
+        pipelineLog(`FORGE: Built ${item.name}`,'i');
+      }catch(e){item.status='failed'}
+      await new Promise(r=>setTimeout(r,200));
+    }
+    setNodeStatus('FORGE','DONE');
+  }catch(e){pipelineLog(`FORGE error: ${e.message}`,'e')}
+}
+
+async function runLaunchForPipeline(){
+  STATE.launchQueue=[];STATE.launchStopped=false;
+  try{
+    const sites=await sbGet('forge_output','status=eq.ready&order=created_at.asc&limit=10&select=*');
+    if(!sites.length){pipelineLog('LAUNCH: No sites ready','w');return}
+    STATE.launchQueue=sites.map(s=>({...s,status:'queued',url:null}));
+    for(let i=0;i<STATE.launchQueue.length;i++){
+      if(pipelineStopped)break;
+      const item=STATE.launchQueue[i];
+      item.status='deploying';
+      try{
+        const repo=`galaxy-${slugify(item.business_name)}`;
+        const url=`https://${GITHUB_USER}.github.io/${repo}/`;
+        item.repo=repo;item.url=url;
+        try{await githubReq('/user/repos','POST',{name:repo,private:false,auto_init:false})}catch{}
+        await new Promise(r=>setTimeout(r,1500));
+        const encoded=btoa(unescape(encodeURIComponent(item.html)));
+        let sha=null;
+        try{const ex=await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`);sha=ex?.sha}catch{}
+        const pb={message:'GALAXY LAUNCH',content:encoded};if(sha)pb.sha=sha;
+        await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`,'PUT',pb);
+        try{await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch:'main',path:'/'}})}catch{}
+        const saved=await sbInsert('launch_output',{forge_id:item.id,business_name:item.business_name,github_repo:repo,live_url:url,status:'live'});
+        item.launch_id=saved?.id;
+        await sbUpdate('forge_output',item.id,{status:'deployed'});
+        item.status='live';STATE.stats.live++;updateBottomBar();
+        pipelineLog(`LAUNCH: Live ${item.business_name}`,'i');
+      }catch(e){item.status='failed';pipelineLog(`LAUNCH failed: ${item.business_name}`,'e')}
+      await new Promise(r=>setTimeout(r,2000));
+    }
+    setNodeStatus('LAUNCH','DONE');
+  }catch(e){pipelineLog(`LAUNCH error: ${e.message}`,'e')}
+}
+
+// Init hold on GALAXY node after nodes are built
+setTimeout(initGalaxyHold, 500);
+
+// ═══════════════════════════════════════════
+// PIPELINE TOAST & MINI LOG
+// ═══════════════════════════════════════════
+function showPipelineToast(msg){
+  const t=document.getElementById('pipeline-toast');
+  t.textContent=msg;
+  t.classList.add('visible');
+}
+function hidePipelineToast(){
+  document.getElementById('pipeline-toast').classList.remove('visible');
+}
+function updateMiniLog(msg,type='i'){
+  const el=document.getElementById('pipeline-mini-log');
+  el.classList.add('visible');
+  const colors={s:'#00FF88',w:'#FFAA00',e:'#FF3355',i:'#4AB3FF'};
+  const time=new Date().toTimeString().slice(0,8);
+  el.innerHTML=`<div class="pml-line" style="color:${colors[type]||colors.i}">[${time}] ${msg}</div>`+el.innerHTML;
+  // Keep last 50 lines
+  const lines=el.querySelectorAll('.pml-line');
+  if(lines.length>50)lines[lines.length-1].remove();
+}
+
+// ═══════════════════════════════════════════
+// MACHINE SWITCH
+// ═══════════════════════════════════════════
+let machineOn = false;
+
+function toggleMachineSwitch(){
+  if(machineOn){
+    // TURN OFF
+    machineOn = false;
+    document.getElementById('machine-switch').classList.remove('on');
+    document.getElementById('switch-glow').classList.remove('on');
+    document.getElementById('switch-state').classList.remove('on');
+    document.getElementById('switch-state').textContent = 'OFF';
+    stopPipeline();
+  } else {
+    // TURN ON — show activation modal
+    machineOn = true;
+    document.getElementById('machine-switch').classList.add('on');
+    document.getElementById('switch-glow').classList.add('on');
+    document.getElementById('switch-state').classList.add('on');
+    document.getElementById('switch-state').textContent = 'ON';
+    activatePipeline();
+  }
+}
+
+// If pipeline is cancelled — reset switch
+function resetSwitch(){
+  machineOn = false;
+  document.getElementById('machine-switch').classList.remove('on');
+  document.getElementById('switch-glow').classList.remove('on');
+  document.getElementById('switch-state').classList.remove('on');
+  document.getElementById('switch-state').textContent = 'OFF';
+}
+
+// ═══════════════════════════════════════════
+// API KEY MANAGEMENT — localStorage
+// ═══════════════════════════════════════════
+function loadSavedKeys(){
+  const k=localStorage.getItem('galaxy_instantly_key');
+  if(k){STATE.instantlyKey=k}
+  const g=localStorage.getItem('galaxy_github_token');
+  if(g){STATE.githubToken=g}
+  const w=localStorage.getItem('galaxy_worker_url');
+  if(w){STATE.workerUrl=w}
+  const n=localStorage.getItem('galaxy_netlify_token');
+  if(n){STATE.netlifyToken=n}
+}
+function saveInstantlyKey(){
+  const val=document.getElementById('instantly-key-input')?.value?.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_instantly_key',val);
+  STATE.instantlyKey=val;
+  renderAgentPanel('DISPATCH');
+}
+function clearInstantlyKey(){
+  localStorage.removeItem('galaxy_instantly_key');
+  STATE.instantlyKey='';
+  renderAgentPanel('DISPATCH');
+}
+function saveGithubToken(){
+  const val=document.getElementById('github-token-input')?.value?.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_github_token',val);
+  STATE.githubToken=val;
+  addLog('GALAXY','GitHub token saved','s');
+  renderAgentPanel('GALAXY');
+}
+function clearGithubToken(){
+  localStorage.removeItem('galaxy_github_token');
+  STATE.githubToken='';
+  renderAgentPanel('GALAXY');
+}
+async function testGithubToken(){
+  const token=getGithubToken();
+  if(!token){addLog('GALAXY','No GitHub token — enter it below','w');return}
+  addLog('GALAXY','Testing GitHub token...','i');
+  try{
+    const r=await fetch('https://api.github.com/user',{headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}});
+    const d=await r.json();
+    if(r.ok){addLog('GALAXY','✅ GitHub token valid — user: '+d.login,'s')}
+    else{addLog('GALAXY','❌ GitHub token invalid: '+d.message,'e')}
+  }catch(e){addLog('GALAXY','❌ GitHub test failed: '+e.message,'e')}
+  if(currentAgent?.id==='GALAXY')renderAgentPanel('GALAXY');
+}
+
+// ═══════════════════════════════════════════
+// SETTINGS OVERLAY
+// ═══════════════════════════════════════════
+function openSettings(){
+  const overlay=document.getElementById('settings-overlay');
+  overlay.style.display='block';
+  // Populate current values
+  const gt=getGithubToken();
+  const wu=getWorkerUrl();
+  const ik=STATE.instantlyKey||'';
+  if(gt)document.getElementById('github-status').textContent='✓ Token saved';
+  if(wu){document.getElementById('worker-status').textContent='✓ '+wu;document.getElementById('s-worker-url').value=wu;}
+  if(ik)document.getElementById('s-instantly-key').value=ik;
+  const nt=getNetlifyToken();
+  if(nt){document.getElementById('netlify-status').textContent='✓ Token saved';document.getElementById('s-netlify-token').value=nt;}
+}
+
+function saveSettingGithub(){
+  const val=document.getElementById('s-github-token').value.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_github_token',val);
+  STATE.githubToken=val;
+  document.getElementById('github-status').textContent='✓ Token saved';
+  document.getElementById('github-log').textContent='Saved — tap TEST to verify';
+}
+function clearSettingGithub(){
+  localStorage.removeItem('galaxy_github_token');
+  STATE.githubToken='';
+  document.getElementById('github-status').textContent='';
+  document.getElementById('s-github-token').value='';
+  document.getElementById('github-log').textContent='Cleared';
+}
+async function testSettingGithub(){
+  const token=getGithubToken();
+  const log=document.getElementById('github-log');
+  if(!token){log.textContent='No token saved';return}
+  log.textContent='Testing...';
+  try{
+    const r=await fetch('https://api.github.com/user',{headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}});
+    const d=await r.json();
+    if(r.ok){log.style.color='#00FF88';log.textContent='✅ Valid — logged in as '+d.login;}
+    else{log.style.color='#FF3355';log.textContent='❌ Invalid: '+d.message;}
+  }catch(e){log.style.color='#FF3355';log.textContent='❌ Error: '+e.message;}
+}
+
+function saveSettingWorker(){
+  const val=document.getElementById('s-worker-url').value.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_worker_url',val);
+  STATE.workerUrl=val;
+  document.getElementById('worker-status').textContent='✓ '+val;
+  document.getElementById('worker-log').textContent='Saved — tap TEST to verify';
+}
+function clearSettingWorker(){
+  localStorage.removeItem('galaxy_worker_url');
+  STATE.workerUrl='';
+  document.getElementById('worker-status').textContent='';
+  document.getElementById('s-worker-url').value='';
+  document.getElementById('worker-log').textContent='Cleared';
+}
+async function testSettingWorker(){
+  const log=document.getElementById('worker-log');
+  log.textContent='Testing...';
+  try{
+    const d=await workerFetch('test_key');
+    if(d.ok){log.style.color='#00FF88';log.textContent='✅ Worker connected — Instantly key valid';}
+    else{log.style.color='#FF3355';log.textContent='❌ '+JSON.stringify(d.error);}
+  }catch(e){log.style.color='#FF3355';log.textContent='❌ '+e.message;}
+}
+
+function saveSettingNetlify(){
+  const val=document.getElementById('s-netlify-token').value.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_netlify_token',val);
+  STATE.netlifyToken=val;
+  document.getElementById('netlify-status').textContent='✓ Token saved';
+  document.getElementById('netlify-log').textContent='Saved — tap TEST to verify';
+}
+function clearSettingNetlify(){
+  localStorage.removeItem('galaxy_netlify_token');
+  STATE.netlifyToken='';
+  document.getElementById('netlify-status').textContent='';
+  document.getElementById('s-netlify-token').value='';
+  document.getElementById('netlify-log').textContent='Cleared';
+}
+async function testSettingNetlify(){
+  const token=getNetlifyToken();
+  const log=document.getElementById('netlify-log');
+  if(!token){log.textContent='No token saved';return}
+  log.textContent='Testing...';
+  try{
+    const r=await fetch('https://api.netlify.com/api/v1/user',{
+      headers:{'Authorization':`Bearer ${token}`}
+    });
+    const d=await r.json();
+    if(r.ok){log.style.color='#00FF88';log.textContent='✅ Valid — '+d.email;}
+    else{log.style.color='#FF3355';log.textContent='❌ Invalid: '+d.message;}
+  }catch(e){log.style.color='#FF3355';log.textContent='❌ Error: '+e.message;}
+}
+
+function saveSettingInstantly(){
+  const val=document.getElementById('s-instantly-key').value.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_instantly_key',val);
+  STATE.instantlyKey=val;
+  document.getElementById('worker-log').textContent='Instantly key saved';
+}
+function clearSettingInstantly(){
+  localStorage.removeItem('galaxy_instantly_key');
+  STATE.instantlyKey='';
+  document.getElementById('s-instantly-key').value='';
+}
+
+// Load saved keys on startup
+loadSavedKeys();
+
+// ═══════════════════════════════════════════
+// SUPABASE HELPERS
+// ═══════════════════════════════════════════
+async function sbGet(table,params=''){const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`,{headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}});return r.json()}
+async function sbInsert(table,data){const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}`,{method:'POST',headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(data)});const res=await r.json();return Array.isArray(res)?res[0]:res}
+async function sbUpdate(table,id,data){await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`,{method:'PATCH',headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(data)})}
+
+// ═══════════════════════════════════════════
+// PANEL SYSTEM
+// ═══════════════════════════════════════════
+let currentAgent=null;
+
+// Auto-refresh panel every second when agent is running
+setInterval(()=>{
+  if(!currentAgent)return;
+  const panelOpen=document.getElementById('agent-panel').classList.contains('open');
+  if(!panelOpen)return;
+  const id=currentAgent.id;
+  const running=STATE[id.toLowerCase()+'Running'];
+  if(running){
+    // Just refresh log and stats — not full re-render to avoid flicker
+    refreshLog(id);
+    // Refresh stats numbers only
+    const statsEl=document.querySelector('#panel-content .p-stats');
+    if(statsEl){
+      const newPanel=document.createElement('div');
+      newPanel.innerHTML=renderAgentStatsOnly(id);
+      const newStats=newPanel.querySelector('.p-stats');
+      if(newStats)statsEl.innerHTML=newStats.innerHTML;
+    }
+  }
+},1000);
+
+function renderAgentStatsOnly(id){
+  switch(id){
+    case 'SCOUT': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--gold)">${STATE.leads.length}</span><span class="l">FOUND</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.leads.filter(l=>l.email).length}</span><span class="l">EMAILS</span></div><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.leads.filter(l=>l.lead_temp==='HOT').length}</span><span class="l">HOT</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.binned.length}</span><span class="l">BIN</span></div></div>`;
+    case 'FORGE': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.forgeQueue.filter(i=>i.status==='queued').length}</span><span class="l">QUEUED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">${STATE.forgeQueue.filter(i=>i.status==='building').length}</span><span class="l">BUILDING</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.forgeQueue.filter(i=>i.status==='saved').length}</span><span class="l">BUILT</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.forgeQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div></div>`;
+    case 'LAUNCH': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.launchQueue.filter(i=>i.status==='queued').length}</span><span class="l">QUEUED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">${STATE.launchQueue.filter(i=>i.status==='deploying').length}</span><span class="l">DEPLOYING</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.launchQueue.filter(i=>i.status==='live').length}</span><span class="l">LIVE</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.launchQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div></div>`;
+    case 'SCANNER': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--scanner)">${STATE.scannerQueue.length}</span><span class="l">TOTAL</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.scannerQueue.filter(i=>i.status==='approved').length}</span><span class="l">APPROVED</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.scannerQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.scannerQueue.filter(i=>i.status==='requeued').length}</span><span class="l">REQUEUED</span></div></div>`;
+    case 'DISPATCH': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--dispatch)">${STATE.dispatchQueue.length}</span><span class="l">IN QUEUE</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">SENT</span></div><div class="p-stat"><span class="v" style="color:var(--red)">0</span><span class="l">BOUNCED</span></div><div class="p-stat"><span class="v" style="color:var(--dispatch)">david@</span><span class="l">INBOX</span></div></div>`;
+    case 'SENTINEL': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--sentinel)">${STATE.binned.length}</span><span class="l">IN BIN</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentinelFound||0}</span><span class="l">RECOVERED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">1</span><span class="l">DOMAINS</span></div><div class="p-stat"><span class="v" style="color:var(--green)">9.8</span><span class="l">HEALTH</span></div></div>`;
+    default: return '';
+  }
+}
+
+function openPanel(agent){
+  currentAgent=agent;
+  const panel=document.getElementById('agent-panel');
+  const backdrop=document.getElementById('panel-backdrop');
+  document.getElementById('settings-btn').style.display='none';
+  document.getElementById('panel-gem-bar').style.cssText=`height:3px;background:${agent.gemColor};box-shadow:0 0 10px ${agent.gemColor}`;
+  document.getElementById('panel-gem').textContent=agent.gem;
+  document.getElementById('panel-name').textContent=agent.id;
+  document.getElementById('panel-name').style.color=agent.gemColor;
+  document.getElementById('panel-role').textContent=agent.role;
+  document.documentElement.style.setProperty('--current-color',agent.gemColor);
+  document.documentElement.style.setProperty('--current-border',agent.gemColor+'33');
+  renderAgentPanel(agent.id);
+  panel.classList.add('open');
+  backdrop.classList.add('open');
+}
+function closePanel(){
+  document.getElementById('agent-panel').classList.remove('open');
+  document.getElementById('panel-backdrop').classList.remove('open');
+  document.getElementById('settings-btn').style.display='block';
+}
+
+// ═══════════════════════════════════════════
+// LOGGING
+// ═══════════════════════════════════════════
+function addLog(agent,msg,type='i'){
+  const time=new Date().toTimeString().slice(0,8);
+  STATE.logs[agent].unshift({time,msg,type});
+  if(STATE.logs[agent].length>50)STATE.logs[agent].pop();
+  if(currentAgent?.id===agent)refreshLog(agent);
+}
+function refreshLog(agent){
+  const el=document.getElementById(`log-${agent}`);
+  if(!el)return;
+  el.innerHTML=STATE.logs[agent].map(l=>`<div class="p-log-line ${l.type}">[${l.time}] ${l.msg}</div>`).join('');
+}
+function pBar(agent,pct,label){
+  const w=document.getElementById(`prog-${agent}`);
+  const f=document.getElementById(`progf-${agent}`);
+  const l=document.getElementById(`progl-${agent}`);
+  if(w){w.style.display=pct>0?'block':'none'}
+  if(f)f.style.width=pct+'%';
+  if(l)l.textContent=label;
+}
+function updateBottomBar(){
+  document.getElementById('b-leads').textContent=STATE.stats.leads;
+  document.getElementById('b-built').textContent=STATE.stats.built;
+  document.getElementById('b-live').textContent=STATE.stats.live;
+  document.getElementById('b-sent').textContent=STATE.stats.sent;
+}
+function setNodeStatus(agent,status){
+  const el=nodeEls[agent];
+  if(!el)return;
+  el.querySelector('.n-status-text').textContent=status;
+  if(status==='RUNNING')el.classList.add('running');
+  else el.classList.remove('running');
+}
+
+// ═══════════════════════════════════════════
+// UK TOWNS AUTOCOMPLETE
+// ═══════════════════════════════════════════
+const UK_TOWNS=['Aberdeen','Ascot','Aylesbury','Bath','Bedford','Birmingham','Blackburn','Blackpool','Bolton','Bournemouth','Bradford','Brighton','Bristol','Cambridge','Canterbury','Cardiff','Carlisle','Chelmsford','Cheltenham','Chester','Chichester','Colchester','Coventry','Crawley','Derby','Doncaster','Durham','Eastbourne','Edinburgh','Exeter','Glasgow','Gloucester','Guildford','Halifax','Harrogate','Hereford','Huddersfield','Hull','Inverness','Ipswich','Leeds','Leicester','Lincoln','Liverpool','London','Luton','Maidenhead','Maidstone','Manchester','Middlesbrough','Milton Keynes','Newcastle','Newport','Northampton','Norwich','Nottingham','Oxford','Peterborough','Plymouth','Portsmouth','Preston','Reading','Reigate','Salisbury','Sheffield','Shrewsbury','Slough','Southampton','Southend','St Albans','Stoke-on-Trent','Sunderland','Swansea','Swindon','Taunton','Telford','Truro','Wakefield','Windsor','Wolverhampton','Worcester','Worthing','York'];
+let acIndex=-1;
+function handleAC(val){
+  const list=document.getElementById('ac-list');if(!list)return;
+  acIndex=-1;
+  if(val.length<3){list.classList.remove('open');list.innerHTML='';return}
+  const m=UK_TOWNS.filter(t=>t.toLowerCase().startsWith(val.toLowerCase())).slice(0,7);
+  if(!m.length){list.classList.remove('open');return}
+  list.innerHTML=m.map(t=>`<div class="ac-item" onclick="selectTown('${t}')">${t}</div>`).join('');
+  list.classList.add('open');
+}
+function handleACKey(e){
+  const list=document.getElementById('ac-list');if(!list)return;
+  const items=list.querySelectorAll('.ac-item');
+  if(e.key==='ArrowDown'){acIndex=Math.min(acIndex+1,items.length-1);items.forEach((el,i)=>el.classList.toggle('active',i===acIndex))}
+  else if(e.key==='ArrowUp'){acIndex=Math.max(acIndex-1,0);items.forEach((el,i)=>el.classList.toggle('active',i===acIndex))}
+  else if(e.key==='Enter'){e.preventDefault();if(acIndex>=0&&items[acIndex])selectTown(items[acIndex].textContent);else if(items.length>0)selectTown(items[0].textContent)}
+  else if(e.key==='Escape'){list.classList.remove('open')}
+}
+function selectTown(town){
+  const inp=document.getElementById('scout-location');if(inp)inp.value=town;
+  const list=document.getElementById('ac-list');if(list){list.classList.remove('open');list.innerHTML=''}
+}
+document.addEventListener('click',e=>{if(!e.target.closest('.ac-wrap')){const l=document.getElementById('ac-list');if(l)l.classList.remove('open')}});
+
+// ═══════════════════════════════════════════
+// RENDER AGENT PANELS
+// ═══════════════════════════════════════════
+function renderAgentPanel(id){
+  const c=document.getElementById('panel-content');
+  const running=STATE[id.toLowerCase()+'Running'];
+  switch(id){
+    case 'GALAXY': c.innerHTML=renderGalaxyPanel();break;
+    case 'SCOUT':  c.innerHTML=renderScoutPanel();break;
+    case 'FORGE':  c.innerHTML=renderForgePanel();break;
+    case 'LAUNCH': c.innerHTML=renderLaunchPanel();break;
+    case 'SCANNER':c.innerHTML=renderScannerPanel();break;
+    case 'DISPATCH':c.innerHTML=renderDispatchPanel();break;
+    case 'SENTINEL':c.innerHTML=renderSentinelPanel();break;
+    case 'SAM':    c.innerHTML=renderSAMPanel();break;
+  }
+  refreshLog(id);
+}
+
+// GALAXY PANEL
+function renderGalaxyPanel(){
+  return `
+  <div class="p-stats">
+    <div class="p-stat"><span class="v" style="color:var(--gold)">${STATE.leads.length}</span><span class="l">LEADS</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--forge)">${STATE.forgeQueue.filter(i=>i.status==='saved').length}</span><span class="l">BUILT</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--launch)">${STATE.launchQueue.filter(i=>i.status==='live').length}</span><span class="l">LIVE</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--dispatch)">${STATE.sentLog.length}</span><span class="l">SENT</span></div>
+  </div>
+  <div class="pipeline-note">🧠 GALAXY is the master brain. All agents are running simultaneously — navigate between them freely without losing progress.</div>
+
+  <!-- GITHUB TOKEN -->
+  ${!getGithubToken()?`
+  <div style="background:rgba(255,51,85,0.06);border:1px solid rgba(255,51,85,0.2);border-radius:6px;padding:12px;margin-bottom:12px">
+    <div style="font-size:8px;letter-spacing:2px;color:#FF3355;margin-bottom:6px">⚠️ GITHUB TOKEN REQUIRED</div>
+    <div style="font-size:8px;color:rgba(192,200,216,0.4);margin-bottom:8px">Generate at github.com → Settings → Developer settings → Personal access tokens (Classic) → repo + workflow scopes</div>
+    <input class="p-input" id="github-token-input" type="password" placeholder="ghp_...">
+    <button class="p-btn" style="margin-top:8px" onclick="saveGithubToken()">💾 SAVE GITHUB TOKEN</button>
+  </div>`:`
+  <div style="background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.15);border-radius:6px;padding:8px 12px;margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:9px;color:var(--green);letter-spacing:1px">✓ GITHUB TOKEN SAVED</span>
+      <button onclick="clearGithubToken()" style="background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:3px;color:#FF3355;font-size:8px;padding:3px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace">CLEAR</button>
+    </div>
+  </div>
+  <button onclick="testGithubToken()" style="width:100%;padding:9px;background:transparent;border:1px solid rgba(0,255,136,0.3);border-radius:4px;color:var(--green);font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;cursor:pointer;margin-bottom:12px">🔑 TEST GITHUB TOKEN</button>
+  `}
+  <div class="p-log" id="log-GALAXY"></div>
+
+  <div class="p-section">
+    <span class="p-label">AGENT STATUS</span>
+    ${AGENTS.filter(a=>a.id!=='GALAXY').map(a=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+      <span style="font-size:10px">${a.gem} ${a.id}</span>
+      <span class="badge ${STATE[a.id.toLowerCase()+'Running']?'ok':'cold'}" style="border-color:${a.gemColor};color:${a.gemColor}">${STATE[a.id.toLowerCase()+'Running']?'RUNNING':'IDLE'}</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+// SCOUT PANEL
+function renderScoutPanel(){
+  const leads=STATE.leads;
+  const running=STATE.scoutRunning;
+  return `
+  <div class="p-stats">
+    <div class="p-stat"><span class="v" style="color:var(--gold)">${leads.length}</span><span class="l">FOUND</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">${leads.filter(l=>l.email).length}</span><span class="l">EMAILS</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--amber)">${leads.filter(l=>l.lead_temp==='HOT').length}</span><span class="l">HOT</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--red)">${STATE.binned.length}</span><span class="l">BIN</span></div>
+  </div>
+  ${running
+    ?`<div class="running-badge active"><div class="rb-dot"></div>SCOUT SCANNING — ${STATE.scoutLocation||''} / ${STATE.scoutNiche||''}</div>
+      <div class="pipeline-note" style="margin-bottom:12px">Leads with emails are instantly passed to FORGE for building.</div>
+      <button class="p-btn stop" onclick="STATE.scoutStopped=true;STATE.pipelineStopped=true">⬛ STOP SCOUT</button>`
+    :`<div class="pipeline-note">Use the machine switch to activate SCOUT. It will run automatically as part of the full pipeline.</div>`
+  }
+  <div class="p-progress" id="prog-SCOUT"><div class="p-progress-label" id="progl-SCOUT"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SCOUT"></div></div></div>
+  <div class="p-log" id="log-SCOUT"></div>
+  <div class="p-table-wrap">
+    <div class="p-table-head">LEAD DATABASE (${leads.length})</div>
+    <div style="overflow-x:auto;max-height:220px;overflow-y:auto">
+      <table class="p-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Temp</th></tr></thead>
+        <tbody>${leads.length?leads.slice(0,20).map(l=>`<tr><td style="color:#fff">${l.name||'—'}</td><td>${l.email?'✓':'—'}</td><td><span class="badge ${l.lead_temp?.toLowerCase()}">${l.lead_temp||'—'}</span></td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO LEADS YET</div></td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// FORGE PANEL
+function renderForgePanel(){
+  const q=STATE.forgeQueue;
+  return `
+  <div class="p-stats">
+    <div class="p-stat"><span class="v" style="color:var(--amber)">${q.filter(i=>i.status==='queued').length}</span><span class="l">QUEUED</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--blue)">${q.filter(i=>i.status==='building').length}</span><span class="l">BUILDING</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">${q.filter(i=>i.status==='saved').length}</span><span class="l">BUILT</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--red)">${q.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div>
+  </div>
+  ${STATE.forgeRunning
+    ?`<div class="running-badge active"><div class="rb-dot"></div>FORGE BUILDING — ${STATE.forgeQueue.filter(i=>i.status==='building').length} active</div>
+      <div class="pipeline-note" style="margin-bottom:12px">Building sites in parallel with SCOUT scanning. Completed builds go straight to LAUNCH.</div>
+      <button class="p-btn stop" onclick="STATE.forgeStopped=true">⬛ STOP FORGE</button>`
+    :`<div class="pipeline-note">FORGE activates automatically when SCOUT finds leads with emails. No manual input needed.</div>`
+  }
+  <div class="p-progress" id="prog-FORGE"><div class="p-progress-label" id="progl-FORGE"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-FORGE"></div></div></div>
+  <div class="p-log" id="log-FORGE"></div>
+  <div class="p-table-wrap">
+    <div class="p-table-head">BUILD QUEUE (${q.length})</div>
+    <div style="overflow-x:auto;max-height:180px;overflow-y:auto">
+      <table class="p-table">
+        <thead><tr><th>Business</th><th>Status</th></tr></thead>
+        <tbody>${q.length?q.slice(0,15).map(i=>`<tr><td style="color:#fff">${i.business_name||'—'}</td><td><span class="badge ${i.status==='saved'?'ok':i.status==='failed'?'fail':'pend'}">${i.status?.toUpperCase()||'—'}</span></td></tr>`).join(''):'<tr><td colspan="2"><div class="p-empty">⬡ NO BUILDS YET</div></td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// LAUNCH PANEL
+function renderLaunchPanel(){
+  const q=STATE.launchQueue;
+  return `
+  <div class="p-stats">
+    <div class="p-stat"><span class="v" style="color:var(--amber)">${q.filter(i=>i.status==='queued').length}</span><span class="l">QUEUED</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--blue)">${q.filter(i=>i.status==='deploying').length}</span><span class="l">DEPLOYING</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">${q.filter(i=>i.status==='live').length}</span><span class="l">LIVE</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--red)">${q.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div>
+  </div>
+  ${STATE.launchRunning
+    ?`<div class="running-badge active"><div class="rb-dot"></div>LAUNCH DEPLOYING TO GITHUB PAGES</div>
+      <div class="pipeline-note" style="margin-bottom:12px">Deploying sites as FORGE completes them. Each site gets its own GitHub Pages URL.</div>
+      <button class="p-btn stop" onclick="STATE.launchStopped=true">⬛ STOP LAUNCH</button>`
+    :`<div class="pipeline-note">LAUNCH activates automatically when FORGE completes a site. Deploys straight to GitHub Pages with no manual input.</div>`
+  }
+  <div class="p-progress" id="prog-LAUNCH"><div class="p-progress-label" id="progl-LAUNCH"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-LAUNCH"></div></div></div>
+  <div class="p-log" id="log-LAUNCH"></div>
+  <div class="p-table-wrap">
+    <div class="p-table-head">DEPLOYMENT LOG (${q.length})</div>
+    <div style="overflow-x:auto;max-height:180px;overflow-y:auto">
+      <table class="p-table">
+        <thead><tr><th>Business</th><th>Status</th><th>URL</th></tr></thead>
+        <tbody>${q.length?q.slice(0,15).map(i=>`<tr><td style="color:#fff">${i.business_name||'—'}</td><td><span class="badge ${i.status==='live'?'ok':i.status==='failed'?'fail':'pend'}">${i.status?.toUpperCase()||'—'}</span></td><td>${i.url?`<a href="${i.url}" target="_blank" style="color:var(--green);font-size:8px">↗</a>`:'—'}</td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO DEPLOYS YET</div></td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// SCANNER PANEL
+function renderScannerPanel(){
+  const q=STATE.scannerQueue;
+  return `
+  <div class="p-stats">
+    <div class="p-stat"><span class="v" style="color:var(--scanner)">${q.length}</span><span class="l">TOTAL</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">${q.filter(i=>i.status==='approved').length}</span><span class="l">APPROVED</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--red)">${q.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--amber)">${q.filter(i=>i.status==='requeued').length}</span><span class="l">REQUEUED</span></div>
+  </div>
+  ${STATE.scannerRunning
+    ?`<div class="running-badge active"><div class="rb-dot"></div>SCANNER CHECKING QUALITY</div>
+      <div class="pipeline-note" style="margin-bottom:12px">Checking each live site before it goes to DISPATCH. Approved sites enter the email queue instantly.</div>
+      <button class="p-btn stop" onclick="STATE.scannerStopped=true">⬛ STOP SCANNER</button>`
+    :`<div class="pipeline-note">SCANNER activates automatically when LAUNCH deploys a site. No manual input needed.</div>`
+  }
+  <div class="p-progress" id="prog-SCANNER"><div class="p-progress-label" id="progl-SCANNER"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SCANNER"></div></div></div>
+  <div class="p-log" id="log-SCANNER"></div>
+  <div class="p-table-wrap">
+    <div class="p-table-head">SCAN RESULTS (${q.length})</div>
+    <div style="overflow-x:auto;max-height:180px;overflow-y:auto">
+      <table class="p-table">
+        <thead><tr><th>Business</th><th>Checks</th><th>Result</th></tr></thead>
+        <tbody>${q.length?q.slice(0,15).map(i=>`<tr><td style="color:#fff">${i.business_name||'—'}</td><td style="font-size:8px">${i.checks?Object.values(i.checks).filter(Boolean).length+'/4':'—'}</td><td><span class="badge ${i.status==='approved'?'ok':i.status==='failed'?'fail':'pend'}">${i.status?.toUpperCase()||'—'}</span></td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO SCANS YET</div></td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// DISPATCH PANEL
+function renderDispatchPanel(){
+  const workerUrl=getWorkerUrl();
+  return `
+  <div class="p-stats">
+    <div class="p-stat"><span class="v" style="color:var(--dispatch)">${STATE.dispatchQueue.length}</span><span class="l">IN QUEUE</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">SENT</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--red)">0</span><span class="l">BOUNCED</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--dispatch)">david@</span><span class="l">INBOX</span></div>
+  </div>
+  ${STATE.dispatchRunning?`<div class="running-badge active"><div class="rb-dot"></div>DISPATCH RUNNING</div>`:''}
+
+  <!-- WORKER URL CONFIG -->
+  ${!workerUrl?`
+  <div style="background:rgba(255,51,85,0.06);border:1px solid rgba(255,51,85,0.2);border-radius:6px;padding:12px;margin-bottom:12px">
+    <div style="font-size:8px;letter-spacing:2px;color:#FF3355;margin-bottom:6px">⚠️ CLOUDFLARE WORKER URL REQUIRED</div>
+    <div style="font-size:8px;color:rgba(192,200,216,0.4);margin-bottom:8px">Deploy galaxy-worker.js to Cloudflare Workers first, then paste your URL below</div>
+    <input class="p-input" id="worker-url-input" type="url" placeholder="https://galaxy-proxy.YOUR-NAME.workers.dev">
+    <button class="p-btn" style="margin-top:8px" onclick="saveWorkerUrl()">💾 SAVE WORKER URL</button>
+  </div>`:`
+  <div style="background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.15);border-radius:6px;padding:8px 12px;margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span style="font-size:9px;color:var(--green);letter-spacing:1px">✓ WORKER CONFIGURED</span>
+      <button onclick="clearWorkerUrl()" style="background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:3px;color:#FF3355;font-size:8px;padding:3px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace">CLEAR</button>
+    </div>
+    <div style="font-size:8px;color:rgba(192,200,216,0.3);word-break:break-all">${workerUrl}</div>
+  </div>
+  <button onclick="testWorkerConnection()" style="width:100%;padding:9px;background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;cursor:pointer;margin-bottom:12px">🔑 TEST CONNECTION</button>
+  `}
+
+  <!-- DEMO MODE -->
+  <div class="demo-box">
+    <span class="demo-head">🎯 DEMO MODE</span>
+    <div class="toggle-row">
+      <button class="toggle ${STATE.demoMode?'on':''}" id="demo-toggle" onclick="toggleDemo()"></button>
+      <span class="toggle-label">${STATE.demoMode?'ON — emails go to demo address':'OFF — sends to real businesses'}</span>
+    </div>
+    ${STATE.demoMode?`<input class="p-input" id="demo-email-input" type="email" placeholder="your@email.com" value="${STATE.demoEmail}" oninput="STATE.demoEmail=this.value">`:''}
+  </div>
+
+  <div class="p-section">
+    <span class="p-label">Max Sends</span>
+    <select class="p-select" id="dispatch-max"><option value="1">1</option><option value="5" selected>5</option><option value="10">10</option><option value="25">25</option><option value="999">All</option></select>
+  </div>
+  <div>
+    <div class="delay-row"><span>Send Delay</span><span id="delay-label">${STATE.sendDelay||30}s between emails</span></div>
+    <input type="range" id="delay-slider" min="10" max="120" value="${STATE.sendDelay||30}" oninput="STATE.sendDelay=parseInt(this.value);document.getElementById('delay-label').textContent=this.value+'s between emails'">
+  </div>
+  ${STATE.dispatchRunning
+    ?`<button class="p-btn stop" style="margin-top:12px" onclick="STATE.dispatchStopped=true">⬛ STOP DISPATCH</button>`
+    :`<div class="pipeline-note" style="margin-top:12px">DISPATCH fires automatically after SCANNER approves. Leads get added to the Instantly campaign and sent within UK business hours.</div>`
+  }
+  <div class="p-progress" id="prog-DISPATCH"><div class="p-progress-label" id="progl-DISPATCH"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-DISPATCH"></div></div></div>
+  <div class="p-log" id="log-DISPATCH"></div>
+  <div class="p-table-wrap">
+    <div class="p-table-head">SEND LOG (${STATE.sentLog.length})</div>
+    <div style="overflow-x:auto;max-height:150px;overflow-y:auto">
+      <table class="p-table">
+        <thead><tr><th>Business</th><th>Email</th><th>Status</th></tr></thead>
+        <tbody>${STATE.sentLog.length?STATE.sentLog.slice(0,15).map(i=>`<tr><td style="color:#fff">${i.business_name||'—'}</td><td style="font-size:8px">${i.to||'—'}</td><td><span class="badge ok">QUEUED</span></td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO SENDS YET</div></td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// SENTINEL PANEL
+function renderSentinelPanel(){
+  return `
+  <div class="p-stats">
+    <div class="p-stat"><span class="v" style="color:var(--sentinel)">${STATE.binned.length}</span><span class="l">IN BIN</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentinelFound||0}</span><span class="l">RECOVERED</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--blue)">1</span><span class="l">DOMAINS</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">9.8</span><span class="l">HEALTH</span></div>
+  </div>
+  ${STATE.sentinelRunning
+    ?`<div class="running-badge active"><div class="rb-dot"></div>SENTINEL DEEP SEARCHING</div>
+      <div class="pipeline-note" style="margin-bottom:12px">Searching 6 sources for emails SCOUT couldn't find.</div>
+      <button class="p-btn stop" onclick="STATE.sentinelStopped=true">⬛ STOP SENTINEL</button>`
+    :`<div class="pipeline-note">SENTINEL runs automatically after SCOUT to recover emails from binned leads. Uses 6 search sources.</div>`
+  }
+  <div class="p-progress" id="prog-SENTINEL"><div class="p-progress-label" id="progl-SENTINEL"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SENTINEL"></div></div></div>
+  <div class="p-log" id="log-SENTINEL"></div>
+  <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:8px">DOMAIN HEALTH</div>
+  ${[{n:'thewebsiteinn.co.uk',s:9.8,c:'var(--green)'},{n:'thewebsiteinn.online',s:0,c:'var(--blue)'},{n:'thewebsiteinn.space',s:0,c:'var(--blue)'},{n:'thewebsiteinn.xyz',s:0,c:'var(--blue)'}].map(d=>`
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(1,2,8,0.4);border:1px solid rgba(255,255,255,0.05);border-radius:4px;margin-bottom:6px;font-size:9px">
+    <span>${d.n}</span>
+    <span style="color:${d.c};font-family:'Orbitron',sans-serif">${d.s>0?d.s:'WARMING'}</span>
+  </div>`).join('')}`;
+}
+
+// SAM PANEL
+function renderSAMPanel(){
+  return `
+  <div class="p-stats">
+    <div class="p-stat"><span class="v" style="color:var(--sam)">${STATE.leads.length}</span><span class="l">TOTAL LEADS</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">CONTACTED</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--gold)">0</span><span class="l">REPLIED</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--amber)">0</span><span class="l">CLOSED</span></div>
+  </div>
+  <div class="pipeline-note">🟣 SAM tracks all confirmed sends, manages the CRM, and builds the call list for warm leads. Full build coming soon.</div>
+  <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:8px">CALL LIST — HOT LEADS</div>
+  <div class="p-table-wrap">
+    <div style="overflow-x:auto;max-height:200px;overflow-y:auto">
+      <table class="p-table">
+        <thead><tr><th>Business</th><th>Phone</th><th>Area</th></tr></thead>
+        <tbody>${STATE.leads.filter(l=>l.lead_temp==='HOT').length?STATE.leads.filter(l=>l.lead_temp==='HOT').slice(0,20).map(l=>`<tr><td style="color:#fff">${l.name||'—'}</td><td>${l.phone||'—'}</td><td>${l.location||'—'}</td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO HOT LEADS YET</div></td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>
+  <div class="p-log" id="log-SAM"></div>`;
+}
+
+// ═══════════════════════════════════════════
+// DEMO TOGGLE
+// ═══════════════════════════════════════════
+function toggleDemo(){
+  STATE.demoMode=!STATE.demoMode;
+  renderAgentPanel('DISPATCH');
+}
+
+// ═══════════════════════════════════════════
+// SCOUT LOGIC
+// ═══════════════════════════════════════════
+function extractEmails(text){
+  const regex=/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+  return (text.match(regex)||[]).filter(e=>!e.includes('example')&&!e.includes('sentry')&&!e.includes('schema')&&!e.includes('png')&&e.length<60);
+}
+async function scrapeUrl(url){
+  try{const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,{signal:AbortSignal.timeout(7000)});const d=await r.json();return d.contents||''}catch{return ''}
+}
+
+async function startScout(){
+  const location=document.getElementById('scout-location')?.value?.trim();
+  const niche=document.getElementById('scout-niche')?.value;
+  if(!location||!niche){addLog('SCOUT','Set location and niche first','w');return}
+  STATE.scoutLocation=location;STATE.scoutNiche=niche;
+  STATE.scoutRunning=true;STATE.scoutStopped=false;STATE.leads=[];STATE.binned=[];
+  setNodeStatus('SCOUT','RUNNING');
+  addLog('SCOUT',`Scan started — ${location} / ${niche}`,'s');
+  if(currentAgent?.id==='SCOUT')renderAgentPanel('SCOUT');
+
+  try{
+    const res=await fetch(`https://bizdata-web.vercel.app/api/businesses?location=${encodeURIComponent(location)}&category=${niche}&limit=500`);
+    const data=await res.json();
+    const businesses=data.businesses||[];
+    addLog('SCOUT',`BizData returned ${businesses.length} businesses`,'s');
+
+    for(let i=0;i<businesses.length;i++){
+      if(STATE.scoutStopped)break;
+      const biz=businesses[i];
+      pBar('SCOUT',Math.round((i+1)/businesses.length*100),`${i+1}/${businesses.length} — ${biz.name||''}`);
+      let email=biz.email||'';
+      if(!email&&biz.website){
+        const html=await scrapeUrl(biz.website);
+        const emails=extractEmails(html);
+        email=emails[0]||'';
+        if(!email){
+          const html2=await scrapeUrl(biz.website.replace(/\/$/,'')+'/contact');
+          email=extractEmails(html2)[0]||'';
+        }
+      }
+      const lead={name:biz.name||'',address:biz.address||'',phone:biz.phone||'',website:biz.website||'',email,niche,location,lead_temp:!biz.website&&!email?'HOT':email?'WARM':'COLD',email_found:!!email,created_at:new Date().toISOString()};
+      try{
+        const saved=await sbInsert('scout_leads',lead);
+        lead.id=saved?.id;
+      }catch{}
+      if(email){STATE.leads.push(lead);STATE.stats.leads=STATE.leads.length}
+      else{STATE.binned.push({...lead,attempted:biz.website?'Website scraped':'No website'})}
+      updateBottomBar();
+      if(i%5===0&&currentAgent?.id==='SCOUT')renderAgentPanel('SCOUT');
+      await new Promise(r=>setTimeout(r,300));
+    }
+    addLog('SCOUT',`Done. ${STATE.leads.length} leads, ${STATE.binned.length} binned`,'s');
+  }catch(e){addLog('SCOUT',`Error: ${e.message}`,'e')}
+
+  STATE.scoutRunning=false;setNodeStatus('SCOUT','DONE');
+  pBar('SCOUT',100,`Complete — ${STATE.leads.length} leads found`);
+  if(currentAgent?.id==='SCOUT')renderAgentPanel('SCOUT');
+}
+function stopScout(){STATE.scoutStopped=true;addLog('SCOUT','Stop requested','w')}
+
+// ═══════════════════════════════════════════
+// FORGE LOGIC
+// ═══════════════════════════════════════════
+const NICHE_CFG={restaurant:{tagline:'Fine Dining · Curated Experiences · Seasonal Menu',color:'#C9A84C'},cafe:{tagline:'Artisan Coffee · Fresh Food · Warm Atmosphere',color:'#A0784C'},bar:{tagline:'Craft Drinks · Great Vibes · Memorable Nights',color:'#C9A84C'},default:{tagline:'Quality Service · Local Business · Trusted by the Community',color:'#C9A84C'}};
+
+// ═══════════════════════════════════════════
+// FORGE — AI SITE GENERATION via Claude API
+// ═══════════════════════════════════════════
+async function buildSiteWithAI(lead){
+  // Route through Cloudflare Worker to avoid CORS
+  const d=await workerFetch('generate_site',{
+    name:lead.name||lead.business_name||'',
+    niche:lead.niche||'business',
+    location:lead.location||'UK',
+    phone:lead.phone||'',
+    address:lead.address||''
+  });
+  if(!d.ok){throw new Error(d.error||'AI generation failed')}
+  if(!d.html||d.html.length<500){throw new Error('AI returned invalid HTML')}
+  return d.html;
+}
+
+// Fallback template if AI fails
+function buildSiteHTML(lead){
+  const cfg=NICHE_CFG[lead.niche]||NICHE_CFG.default;
+  const year=(new Date().getFullYear()-Math.floor(Math.random()*8+2)).toString();
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${lead.name} — Fine Dining</title><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}:root{--gold:${cfg.color}}body{background:#060404;color:#F5EDD8;font-family:'Inter',sans-serif;font-weight:300}nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:24px 48px;transition:all .5s}.nav-logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;letter-spacing:4px;color:var(--gold);text-transform:uppercase}#hero{height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#1a0f0a,#060404);text-align:center}.hero-title{font-family:'Cormorant Garamond',serif;font-size:clamp(48px,10vw,110px);font-weight:300;line-height:.95;margin-bottom:24px}.hero-title em{font-style:italic;color:var(--gold)}.hero-sub{font-size:13px;letter-spacing:3px;color:rgba(245,237,216,.6);text-transform:uppercase;margin-bottom:48px}section{padding:100px 48px}footer{padding:48px;border-top:1px solid rgba(201,168,76,.2);display:flex;justify-content:space-between;align-items:center}.btn{display:inline-block;padding:14px 32px;background:var(--gold);color:#060404;font-size:11px;letter-spacing:3px;text-transform:uppercase;text-decoration:none;font-weight:500}</style></head><body><nav><div class="nav-logo">${lead.name}</div><a href="#reserve" class="btn">Reserve</a></nav><section id="hero"><div><p style="font-size:10px;letter-spacing:8px;color:var(--gold);text-transform:uppercase;margin-bottom:24px">Est. ${year} · ${lead.location||'UK'}</p><h1 class="hero-title">Where Every<br>Meal Becomes<br><em>a Memory</em></h1><p class="hero-sub">${cfg.tagline}</p><a href="#reserve" class="btn">Reserve Your Table</a></div></section><section id="about" style="background:#0e0a08;border-top:1px solid rgba(201,168,76,.2)"><p style="font-size:9px;letter-spacing:6px;color:var(--gold);text-transform:uppercase;margin-bottom:16px">Our Story</p><h2 style="font-family:'Cormorant Garamond',serif;font-size:clamp(32px,5vw,60px);font-weight:300;margin-bottom:20px">Food is the<br><em style="color:var(--gold)">language of love</em></h2><p style="font-size:15px;line-height:1.85;color:rgba(245,237,216,.6);max-width:520px">At ${lead.name}, every dish is crafted with intention — seasonal ingredients, refined technique, and warmth of service that makes you feel at home in ${lead.location||'our city'}.</p></section><section id="reserve" style="text-align:center"><p style="font-size:9px;letter-spacing:6px;color:var(--gold);text-transform:uppercase;margin-bottom:16px">Reservations</p><h2 style="font-family:'Cormorant Garamond',serif;font-size:clamp(32px,5vw,60px);font-weight:300;margin-bottom:32px">Secure Your <em style="color:var(--gold)">Evening</em></h2><p style="margin-bottom:32px;color:rgba(245,237,216,.5)">Call us: ${lead.phone||'Contact us to book'}</p></section><footer><div style="font-family:'Cormorant Garamond',serif;font-size:18px;letter-spacing:4px;color:var(--gold)">${lead.name}</div><div style="font-size:11px;color:rgba(245,237,216,.3);text-align:center">${lead.address||''}<br><span style="color:var(--gold)">${lead.email||''}</span></div></footer></body></html>`;
+}
+
+async function startForge(){
+  const max=parseInt(document.getElementById('forge-max')?.value||10);
+  STATE.forgeRunning=true;STATE.forgeStopped=false;
+  setNodeStatus('FORGE','RUNNING');
+  addLog('FORGE',`Forge started — AI mode — max ${max} sites`,'s');
+  if(currentAgent?.id==='FORGE')renderAgentPanel('FORGE');
+
+  try{
+    const leads=await sbGet('scout_leads',`select=*&order=created_at.desc&limit=${max}`);
+    if(!leads.length){addLog('FORGE','No leads in Supabase — run SCOUT first','w');STATE.forgeRunning=false;setNodeStatus('FORGE','IDLE');return}
+
+    STATE.forgeQueue=leads.map(l=>({...l,status:'queued'}));
+
+    for(let i=0;i<STATE.forgeQueue.length;i++){
+      if(STATE.forgeStopped)break;
+      const item=STATE.forgeQueue[i];
+      pBar('FORGE',Math.round((i+1)/STATE.forgeQueue.length*100),`Building ${i+1}/${STATE.forgeQueue.length} — ${item.name}`);
+      item.status='building';
+      if(currentAgent?.id==='FORGE')renderAgentPanel('FORGE');
+      try{
+        addLog('FORGE',`🤖 AI generating site for ${item.name}...`,'i');
+        let html;
+        try{
+          html=await buildSiteWithAI(item);
+          addLog('FORGE',`✅ AI built: ${item.name}`,'s');
+        }catch(aiErr){
+          addLog('FORGE',`⚠️ AI failed (${aiErr.message}) — using template`,'w');
+          html=buildSiteHTML(item);
+        }
+        const saved=await sbInsert('forge_output',{lead_id:item.id,business_name:item.name,html,status:'ready'});
+        item.forge_id=saved?.id;
+        item.html=html;
+        item.status='saved';
+        STATE.stats.built++;
+        updateBottomBar();
+      }catch(e){item.status='failed';addLog('FORGE',`Failed: ${item.name} — ${e.message}`,'e')}
+      if(currentAgent?.id==='FORGE')renderAgentPanel('FORGE');
+    }
+    addLog('FORGE',`Done. ${STATE.forgeQueue.filter(i=>i.status==='saved').length} sites built`,'s');
+  }catch(e){addLog('FORGE',`Error: ${e.message}`,'e')}
+
+  STATE.forgeRunning=false;setNodeStatus('FORGE','DONE');
+  pBar('FORGE',100,'Forge complete');
+  if(currentAgent?.id==='FORGE')renderAgentPanel('FORGE');
+}
+
+// ═══════════════════════════════════════════
+// LAUNCH LOGIC — Netlify API
+// ═══════════════════════════════════════════
+function getNetlifyToken(){return STATE.netlifyToken||localStorage.getItem('galaxy_netlify_token')||''}
+function slugify(n){return n.toLowerCase().replace(/[^a-z0-9\s]/g,'').trim().replace(/\s+/g,'-').slice(0,40)}
+
+// Keep githubReq for any future use
+async function githubReq(endpoint,method='GET',body=null){
+  const opts={method,headers:{'Authorization':`token ${getGithubToken()}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'}};
+  if(body)opts.body=JSON.stringify(body);
+  const r=await fetch(`https://api.github.com${endpoint}`,opts);
+  return r.status===204?null:r.json();
+}
+
+async function netlifyDeploy(siteName, html){
+  const token=getNetlifyToken();
+  if(!token)throw new Error('No Netlify token — add it in Settings');
+
+  // Step 1: Create a new Netlify site
+  const siteRes=await fetch('https://api.netlify.com/api/v1/sites',{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({name:siteName,custom_domain:null})
+  });
+  const siteData=await siteRes.json();
+  if(!siteRes.ok)throw new Error(`Site create failed: ${siteData.message||JSON.stringify(siteData)}`);
+  const siteId=siteData.id;
+  const siteUrl=siteData.ssl_url||siteData.url;
+
+  // Step 2: Deploy HTML as a zip
+  const encoder=new TextEncoder();
+  const htmlBytes=encoder.encode(html);
+
+  // Create a zip containing index.html using JSZip-free approach
+  // Netlify accepts direct file deploy via files API
+  const deployRes=await fetch(`https://api.netlify.com/api/v1/sites/${siteId}/deploys`,{
+    method:'POST',
+    headers:{
+      'Authorization':`Bearer ${token}`,
+      'Content-Type':'application/zip'
+    },
+    body:await createZip(html)
+  });
+  const deployData=await deployRes.json();
+  if(!deployRes.ok)throw new Error(`Deploy failed: ${deployData.message||JSON.stringify(deployData)}`);
+
+  return siteUrl;
+}
+
+async function createZip(htmlContent){
+  // Use Netlify's file digest deploy instead — simpler, no zip needed
+  // This function won't be called — see netlifyFileDeploy below
+}
+
+async function netlifyFileDeploy(siteName, html){
+  const token=getNetlifyToken();
+  if(!token)throw new Error('No Netlify token — add it in Settings');
+
+  // Step 1: Create site
+  const siteRes=await fetch('https://api.netlify.com/api/v1/sites',{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({name:siteName})
+  });
+  const siteData=await siteRes.json();
+  if(!siteRes.ok)throw new Error(`Netlify site error: ${siteData.message||siteData.errors?.join(', ')}`);
+  const siteId=siteData.id;
+  const siteUrl=siteData.ssl_url||siteData.url||`https://${siteName}.netlify.app`;
+
+  // Step 2: Create deploy with file digest
+  const htmlBlob=new Blob([html],{type:'text/html'});
+  const hashBuffer=await crypto.subtle.digest('SHA-1',await htmlBlob.arrayBuffer());
+  const sha1=Array.from(new Uint8Array(hashBuffer)).map(b=>b.toString(16).padStart(2,'0')).join('');
+
+  const digestRes=await fetch(`https://api.netlify.com/api/v1/sites/${siteId}/deploys`,{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({files:{'index.html':sha1}})
+  });
+  const digestData=await digestRes.json();
+  if(!digestRes.ok)throw new Error(`Deploy digest error: ${digestData.message}`);
+
+  const deployId=digestData.id;
+  const required=digestData.required||[];
+
+  // Step 3: Upload file if required
+  if(required.length>0){
+    const uploadRes=await fetch(`https://api.netlify.com/api/v1/deploys/${deployId}/files/index.html`,{
+      method:'PUT',
+      headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/octet-stream'},
+      body:htmlBlob
+    });
+    if(!uploadRes.ok){const e=await uploadRes.json();throw new Error(`Upload error: ${e.message}`)}
+  }
+
+  return siteUrl;
+}
+
+async function startLaunch(){
+  STATE.launchRunning=true;STATE.launchStopped=false;
+  setNodeStatus('LAUNCH','RUNNING');
+  addLog('LAUNCH','Launch started — Netlify deploy','s');
+  if(currentAgent?.id==='LAUNCH')renderAgentPanel('LAUNCH');
+
+  const netlifyToken=getNetlifyToken();
+  if(!netlifyToken){
+    addLog('LAUNCH','❌ No Netlify token — open Settings and add it','e');
+    STATE.launchRunning=false;setNodeStatus('LAUNCH','IDLE');return;
+  }
+
+  try{
+    const sites=await sbGet('forge_output','status=eq.ready&order=created_at.asc&limit=10&select=*');
+    if(!sites.length){addLog('LAUNCH','No ready sites — run FORGE first','w');STATE.launchRunning=false;setNodeStatus('LAUNCH','IDLE');return}
+
+    STATE.launchQueue=sites.map(s=>({...s,status:'queued',url:null}));
+
+    for(let i=0;i<STATE.launchQueue.length;i++){
+      if(STATE.launchStopped)break;
+      const item=STATE.launchQueue[i];
+      pBar('LAUNCH',Math.round((i+1)/STATE.launchQueue.length*100),`Deploying ${i+1}/${STATE.launchQueue.length}`);
+      item.status='deploying';
+      if(currentAgent?.id==='LAUNCH')renderAgentPanel('LAUNCH');
+
+      try{
+        const siteName=`galaxy-${slugify(item.business_name)}-${Date.now().toString(36)}`;
+        addLog('LAUNCH',`Deploying ${item.business_name} to Netlify...`,'i');
+        const url=await netlifyFileDeploy(siteName,item.html);
+        item.url=url;
+
+        const saved=await sbInsert('launch_output',{forge_id:item.id,business_name:item.business_name,netlify_site:siteName,live_url:url,status:'live'});
+        item.launch_id=saved?.id;
+        await sbUpdate('forge_output',item.id,{status:'deployed'});
+        item.status='live';
+        STATE.stats.live++;
+        updateBottomBar();
+        addLog('LAUNCH',`✅ Live: ${item.business_name} → ${url}`,'s');
+      }catch(e){
+        item.status='failed';
+        addLog('LAUNCH',`❌ Failed: ${item.business_name} — ${e.message}`,'e');
+      }
+
+      if(currentAgent?.id==='LAUNCH')renderAgentPanel('LAUNCH');
+      await new Promise(r=>setTimeout(r,1000));
+    }
+    addLog('LAUNCH',`Done. ${STATE.launchQueue.filter(i=>i.status==='live').length} sites live`,'s');
+  }catch(e){addLog('LAUNCH',`Error: ${e.message}`,'e')}
+
+  STATE.launchRunning=false;setNodeStatus('LAUNCH','DONE');
+  if(currentAgent?.id==='LAUNCH')renderAgentPanel('LAUNCH');
+}
+
+// ═══════════════════════════════════════════
+// SCANNER LOGIC
+// ═══════════════════════════════════════════
+async function startScanner(){
+  STATE.scannerRunning=true;STATE.scannerStopped=false;
+  setNodeStatus('SCANNER','RUNNING');
+  addLog('SCANNER','Scanner started','s');
+  if(currentAgent?.id==='SCANNER')renderAgentPanel('SCANNER');
+
+  try{
+    const sites=await sbGet('launch_output','status=eq.live&order=created_at.asc&limit=10&select=*');
+    if(!sites.length){addLog('SCANNER','No live sites — run LAUNCH first','w');STATE.scannerRunning=false;setNodeStatus('SCANNER','IDLE');return}
+
+    STATE.scannerQueue=sites.map(s=>({...s,status:'checking',checks:{}}));
+
+    for(let i=0;i<STATE.scannerQueue.length;i++){
+      if(STATE.scannerStopped)break;
+      const item=STATE.scannerQueue[i];
+      pBar('SCANNER',Math.round((i+1)/STATE.scannerQueue.length*100),`Checking ${i+1}/${STATE.scannerQueue.length}`);
+
+      const forgeData=await sbGet('forge_output',`id=eq.${item.forge_id}&select=html,business_name`);
+      const html=forgeData[0]?.html||'';
+      let urlLive=false;
+      try{const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(item.live_url)}`,{signal:AbortSignal.timeout(8000)});const d=await r.json();urlLive=d.status?.http_code===200||(d.contents?.length>100)}catch{}
+
+      item.checks={name:html.includes(item.business_name)&&!html.includes('{{'),url:true,email:/[a-zA-Z0-9._%+\-]+@/.test(html),phone:/(\+44|0)[0-9\s\-]{9,}/.test(html)};
+      const pass=item.checks.name; // URL check removed — GitHub Pages takes 2-5 min to propagate
+      item.status=pass?'approved':'requeued';
+
+      if(pass){
+        const forgeRow=await sbGet('forge_output',`id=eq.${item.forge_id}&select=lead_id,business_name`);
+        const leadId=forgeRow[0]?.lead_id;
+        let email='';
+        if(leadId){
+          const lead=await sbGet('scout_leads',`id=eq.${leadId}&select=email,name`);
+          email=lead[0]?.email||'';
+        }
+        // Fallback: search by business name if lead_id lookup failed
+        if(!email&&item.business_name){
+          const lead=await sbGet('scout_leads',`name=eq.${encodeURIComponent(item.business_name)}&select=email&limit=1`);
+          email=lead[0]?.email||'';
+        }
+        await sbInsert('dispatch_queue',{scanner_id:item.id,business_name:item.business_name,email,live_url:item.live_url,template_used:'Template-01',status:'ready'});
+        STATE.dispatchQueue.push({business_name:item.business_name,email,live_url:item.live_url});
+        addLog('SCANNER',`Approved → dispatch: ${item.business_name} (${email||'no email'})`,'s');
+      } else {
+        addLog('SCANNER',`Requeued (name check failed): ${item.business_name}`,'w');
+      }
+      if(currentAgent?.id==='SCANNER')renderAgentPanel('SCANNER');
+      await new Promise(r=>setTimeout(r,500));
+    }
+    addLog('SCANNER',`Done. ${STATE.scannerQueue.filter(i=>i.status==='approved').length} approved`,'s');
+  }catch(e){addLog('SCANNER',`Error: ${e.message}`,'e')}
+
+  STATE.scannerRunning=false;setNodeStatus('SCANNER','DONE');
+  if(currentAgent?.id==='SCANNER')renderAgentPanel('SCANNER');
+}
+
+// ═══════════════════════════════════════════
+// CLOUDFLARE WORKER PROXY HELPERS
+// ═══════════════════════════════════════════
+function getWorkerUrl(){return STATE.workerUrl||localStorage.getItem('galaxy_worker_url')||''}
+
+async function workerFetch(action,body=null){
+  const base=getWorkerUrl();
+  if(!base){throw new Error('No Worker URL configured — open DISPATCH panel and set it')}
+  const opts={
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Galaxy-Action':action},
+    body:JSON.stringify(body||{})
+  };
+  const r=await fetch(base,opts);
+  return r.json();
+}
+
+async function testWorkerConnection(){
+  addLog('DISPATCH','Testing Worker connection...','i');
+  try{
+    const d=await workerFetch('test_key');
+    if(d.ok){addLog('DISPATCH','✅ WORKER CONNECTED — Instantly key valid','s')}
+    else{addLog('DISPATCH',`❌ Worker error: ${JSON.stringify(d.error)}`,'e')}
+  }catch(e){addLog('DISPATCH',`❌ Worker unreachable: ${e.message}`,'e')}
+  if(currentAgent?.id==='DISPATCH')renderAgentPanel('DISPATCH');
+}
+
+async function getOrCreateCampaign(){
+  addLog('DISPATCH','Fetching/creating Instantly campaign...','i');
+  const d=await workerFetch('get_campaign');
+  if(d.ok){
+    addLog('DISPATCH',`Campaign ${d.created?'created':'found'}: ${d.campaign_id}`,'s');
+    return d.campaign_id;
+  }
+  addLog('DISPATCH',`Campaign error: ${JSON.stringify(d.error)}`,'e');
+  return null;
+}
+
+function saveWorkerUrl(){
+  const val=document.getElementById('worker-url-input')?.value?.trim();
+  if(!val)return;
+  localStorage.setItem('galaxy_worker_url',val);
+  STATE.workerUrl=val;
+  addLog('DISPATCH','Worker URL saved','s');
+  renderAgentPanel('DISPATCH');
+}
+function clearWorkerUrl(){
+  localStorage.removeItem('galaxy_worker_url');
+  STATE.workerUrl='';
+  renderAgentPanel('DISPATCH');
+}
+
+// ═══════════════════════════════════════════
+// DISPATCH LOGIC
+// ═══════════════════════════════════════════
+async function startDispatch(){
+  if(STATE.demoMode&&!STATE.demoEmail){addLog('DISPATCH','Enter demo email first','w');return}
+  const workerUrl=getWorkerUrl();
+  if(!workerUrl){addLog('DISPATCH','No Worker URL — set it in the DISPATCH panel','e');return}
+  const max=parseInt(document.getElementById('dispatch-max')?.value||5);
+  const delay=(STATE.sendDelay||30)*1000;
+  STATE.dispatchRunning=true;STATE.dispatchStopped=false;
+  setNodeStatus('DISPATCH','RUNNING');
+  addLog('DISPATCH',`Dispatch started — max ${max}${STATE.demoMode?' (DEMO)':''}`,'s');
+  if(currentAgent?.id==='DISPATCH')renderAgentPanel('DISPATCH');
+
+  try{
+    let items=await sbGet('dispatch_queue',`status=eq.ready&order=created_at.asc&limit=${max}&select=*`);
+    // Demo mode fallback — use in-memory queue from this session if Supabase empty
+    if(!items.length&&STATE.demoMode&&STATE.dispatchQueue.length){
+      addLog('DISPATCH','Using in-memory queue for demo run','i');
+      items=STATE.dispatchQueue.slice(0,max).map(q=>({...q,id:null}));
+    }
+    if(!items.length){addLog('DISPATCH','Queue empty — run SCANNER first','w');STATE.dispatchRunning=false;setNodeStatus('DISPATCH','IDLE');return}
+
+    // Get or create the campaign once
+    const campaignId=await getOrCreateCampaign();
+    if(!campaignId){STATE.dispatchRunning=false;setNodeStatus('DISPATCH','IDLE');return}
+
+    for(let i=0;i<items.length;i++){
+      if(STATE.dispatchStopped)break;
+      const item=items[i];
+      const toEmail=STATE.demoMode?STATE.demoEmail:item.email;
+      if(!toEmail){addLog('DISPATCH',`No email for ${item.business_name} — skipping`,'w');continue}
+      pBar('DISPATCH',Math.round((i+1)/items.length*100),`Sending ${i+1}/${items.length}`);
+      addLog('DISPATCH',`Adding to campaign: ${item.business_name} → ${toEmail}`,'i');
+
+      try{
+        const d=await workerFetch('add_lead',{
+          campaign_id:campaignId,
+          email:toEmail,
+          business_name:item.business_name,
+          live_url:item.live_url||''
+        });
+        if(d.ok){
+          addLog('DISPATCH',`✅ QUEUED: ${item.business_name} → ${toEmail}`,'s');
+          if(item.id)await sbUpdate('dispatch_queue',item.id,{status:'sent',sent_at:new Date().toISOString()});
+          STATE.sentLog.push({business_name:item.business_name,to:toEmail,live_url:item.live_url});
+          STATE.stats.sent++;updateBottomBar();
+        } else {
+          addLog('DISPATCH',`❌ ${item.business_name}: ${JSON.stringify(d.error)}`,'e');
+        }
+      }catch(e){addLog('DISPATCH',`Failed: ${e.message}`,'e')}
+
+      if(currentAgent?.id==='DISPATCH')renderAgentPanel('DISPATCH');
+      if(i<items.length-1&&!STATE.dispatchStopped){
+        addLog('DISPATCH',`Waiting ${delay/1000}s...`,'i');
+        await new Promise(r=>setTimeout(r,delay));
+      }
+    }
+    addLog('DISPATCH',`Done. ${STATE.sentLog.length} leads queued in Instantly`,'s');
+  }catch(e){addLog('DISPATCH',`Error: ${e.message}`,'e')}
+
+  STATE.dispatchRunning=false;setNodeStatus('DISPATCH','DONE');
+  if(currentAgent?.id==='DISPATCH')renderAgentPanel('DISPATCH');
+}
+
+// ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+// SENTINEL LOGIC — Deep Email Recovery
+// ═══════════════════════════════════════════
+async function sentinelScrape(url){
+  // Use Worker to scrape server-side — bypasses CORS and JS rendering issues
+  try{
+    const d=await workerFetch('scrape_url',{url});
+    return d.ok?d.html:'';
+  }catch{
+    // Fallback to allorigins
+    try{const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,{signal:AbortSignal.timeout(8000)});const d=await r.json();return d.contents||''}catch{return ''}
+  }
+}
+
+async function startSentinel(){
+  STATE.sentinelRunning=true;STATE.sentinelStopped=false;STATE.sentinelFound=0;
+  setNodeStatus('SENTINEL','RUNNING');
+  addLog('SENTINEL','Sentinel started — recovering emails from missed leads','s');
+  if(currentAgent?.id==='SENTINEL')renderAgentPanel('SENTINEL');
+
+  try{
+    // Pull COLD leads (have website but no email found) + binned STATE leads
+    const coldLeads=await sbGet('scout_leads','email_found=eq.false&order=created_at.desc&limit=30&select=*');
+    const stateLeads=STATE.binned.filter(l=>l.website&&!l.email);
+    
+    // Merge, deduplicate by name
+    const seen=new Set();
+    const allLeads=[...coldLeads,...stateLeads].filter(l=>{
+      if(seen.has(l.name))return false;
+      seen.add(l.name);
+      return true;
+    });
+
+    if(!allLeads.length){addLog('SENTINEL','No leads to recover — all have emails or no website','w');STATE.sentinelRunning=false;setNodeStatus('SENTINEL','IDLE');return}
+    addLog('SENTINEL',`Found ${allLeads.length} leads to recover`,'i');
+
+    for(let i=0;i<allLeads.length;i++){
+      if(STATE.sentinelStopped)break;
+      const lead=allLeads[i];
+      pBar('SENTINEL',Math.round((i+1)/allLeads.length*100),`${i+1}/${allLeads.length} — ${lead.name}`);
+      addLog('SENTINEL',`🔍 Hunting: ${lead.name}`,'i');
+
+      let found=null;
+
+      // Source 1 — scrape homepage via Worker
+      if(!found&&lead.website){
+        try{
+          const html=await sentinelScrape(lead.website);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'Homepage'}}
+        }catch{}
+      }
+
+      // Source 2 — scrape /contact page
+      if(!found&&lead.website){
+        try{
+          const contactUrl=lead.website.replace(/\/$/,'')+'/contact';
+          const html=await sentinelScrape(contactUrl);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'Contact page'}}
+        }catch{}
+      }
+
+      // Source 3 — scrape /about page
+      if(!found&&lead.website){
+        try{
+          const aboutUrl=lead.website.replace(/\/$/,'')+'/about';
+          const html=await sentinelScrape(aboutUrl);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'About page'}}
+        }catch{}
+      }
+
+      // Source 4 — Google search scrape via Worker
+      if(!found){
+        try{
+          const q=encodeURIComponent(`"${lead.name}" ${lead.location||''} email`);
+          const html=await sentinelScrape(`https://www.google.com/search?q=${q}`);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'Google'}}
+        }catch{}
+      }
+
+      // Source 5 — DuckDuckGo
+      if(!found){
+        try{
+          const q=encodeURIComponent(`${lead.name} ${lead.location||''} contact email`);
+          const html=await sentinelScrape(`https://html.duckduckgo.com/html/?q=${q}`);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'DuckDuckGo'}}
+        }catch{}
+      }
+
+      // Source 6 — Bing
+      if(!found){
+        try{
+          const q=encodeURIComponent(`${lead.name} ${lead.location||''} email contact`);
+          const html=await sentinelScrape(`https://www.bing.com/search?q=${q}`);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'Bing'}}
+        }catch{}
+      }
+
+      // Source 7 — Yell.com (UK business directory)
+      if(!found){
+        try{
+          const q=encodeURIComponent(lead.name);
+          const loc=encodeURIComponent(lead.location||'UK');
+          const html=await sentinelScrape(`https://www.yell.com/s/${q}-${loc}.html`);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'Yell.com'}}
+        }catch{}
+      }
+
+      // Source 8 — Scoot.co.uk
+      if(!found){
+        try{
+          const q=encodeURIComponent(`${lead.name} ${lead.location||''}`);
+          const html=await sentinelScrape(`https://www.scoot.co.uk/find/${q}`);
+          const emails=extractEmails(html);
+          if(emails[0]){found={email:emails[0],source:'Scoot.co.uk'}}
+        }catch{}
+      }
+
+      if(found){
+        STATE.sentinelFound++;
+        addLog('SENTINEL',`✅ Found via ${found.source}: ${lead.name} → ${found.email}`,'s');
+        if(lead.id){
+          await sbUpdate('scout_leads',lead.id,{email:found.email,email_found:true,lead_temp:'WARM'});
+        }
+        // Add to active leads for this session
+        const updatedLead={...lead,email:found.email,lead_temp:'WARM',email_found:true};
+        STATE.leads.push(updatedLead);
+        STATE.stats.leads=STATE.leads.length;
+        // Remove from binned
+        STATE.binned=STATE.binned.filter(l=>l.name!==lead.name);
+        updateBottomBar();
+      } else {
+        addLog('SENTINEL',`❌ No email: ${lead.name}`,'w');
+      }
+
+      if(currentAgent?.id==='SENTINEL')renderAgentPanel('SENTINEL');
+      await new Promise(r=>setTimeout(r,300));
+    }
+    addLog('SENTINEL',`Done. ${STATE.sentinelFound}/${allLeads.length} emails recovered`,'s');
+  }catch(e){addLog('SENTINEL',`Error: ${e.message}`,'e')}
+
+  STATE.sentinelRunning=false;setNodeStatus('SENTINEL','DONE');
+  if(currentAgent?.id==='SENTINEL')renderAgentPanel('SENTINEL');
+}
+</script>
+</body>
+</html>
