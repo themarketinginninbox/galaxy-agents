@@ -948,6 +948,16 @@ async function createZip(filename, content){
 const parallelQueue=[];
 let parallelRunning=false;
 
+let launchedBusinessNames=null;
+async function getlaunchedNames(){
+  if(launchedBusinessNames)return launchedBusinessNames;
+  try{
+    const rows=await sbGet('launch_output','select=business_name&limit=1000');
+    launchedBusinessNames=new Set((rows||[]).map(r=>r.business_name?.toLowerCase().trim()));
+  }catch{launchedBusinessNames=new Set()}
+  return launchedBusinessNames;
+}
+
 async function triggerParallelPipeline(lead){
   parallelQueue.push(lead);
   if(parallelRunning)return; // already processing queue
@@ -957,9 +967,9 @@ async function triggerParallelPipeline(lead){
     const l=parallelQueue.shift();
     try{
       // Skip if already processed
-      const existing=await sbGet('launch_output',`business_name=eq.${encodeURIComponent(l.name)}&limit=1&select=live_url`);
-      if(existing&&existing.length>0){
-        pipelineLog(`⏭️ SKIP: ${l.name} already processed — ${existing[0].live_url}`,'i');
+      const launched=await getlaunchedNames();
+      if(launched.has(l.name?.toLowerCase().trim())){
+        pipelineLog(`⏭️ SKIP: ${l.name} already processed`,'i');
         continue;
       }
 
@@ -972,7 +982,7 @@ async function triggerParallelPipeline(lead){
         html=await buildSiteWithAI(l);
         pipelineLog(`🔴 FORGE: AI site generated for ${l.name}`,'s');
       }catch(e){
-        pipelineLog(`🔴 FORGE: AI failed (${e.message}) — using template`,'w');
+        pipelineLog(`🔴 FORGE: AI failed (${e.message||JSON.stringify(e)}) — using template`,'w');
         html=buildSiteHTML(l);
       }
       const forgeRow=await sbInsert('forge_output',{lead_id:l.id,business_name:l.name,html,status:'ready'});
@@ -2035,7 +2045,7 @@ async function netlifyFileDeploy(siteName, html){
       body:JSON.stringify({name:siteName})
     });
     const siteData=await siteRes.json();
-    if(!siteRes.ok)throw new Error(`Netlify site error: ${siteData.message||siteData.errors?.join(', ')}`);
+    if(!siteRes.ok)throw new Error(`Netlify site error: ${siteData.message||JSON.stringify(siteData.errors)||JSON.stringify(siteData)}`);
     siteId=siteData.id;
     siteUrl=siteData.ssl_url||siteData.url||`https://${siteName}.netlify.app`;
     // Cache it so we reuse next time
