@@ -2812,10 +2812,11 @@ async function buildSiteWithAI(lead){
   // Route through Cloudflare Worker to avoid CORS
   const d=await workerFetch('generate_site',{
     name:lead.name||lead.business_name||'',
-    niche:lead.niche||'business',
+    niche:lead.niche||lead.scanner_intel?.detected_niche||'business',
     location:lead.location||'UK',
-    phone:lead.phone||'',
-    address:lead.address||''
+    phone:lead.scanner_intel?.phone||lead.phone||'',
+    email:lead.scanner_intel?.email||lead.email||'',
+    address:lead.scanner_intel?.address||lead.address||''
   });
   if(!d.ok){throw new Error(d.error||'AI generation failed')}
   if(!d.html||d.html.length<500){throw new Error('AI returned invalid HTML')}
