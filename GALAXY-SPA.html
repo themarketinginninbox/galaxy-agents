@@ -1424,50 +1424,45 @@ async function runScoutForPipeline(location, niche){
     setNodeStatus('SCOUT','DONE');
     pipelineLog(`🔵 SCOUT: Done — ${STATE.leads.length} Track 2 leads ready, ${STATE.binned.filter(b=>b.track===1).length} Track 1 sent to SENTINEL`,'s');
     
-    // ── SENTINEL: Deep email search for Track 1 (no website) businesses
+    // ── SENTINEL: Claude-powered email search for Track 1 (no website) businesses
     const track1=STATE.binned.filter(b=>b.track===1&&!b.email);
     if(track1.length>0&&!pipelineStopped){
-      pipelineLog(`🔵 SENTINEL: Searching emails for ${track1.length} no-website businesses...`,'i');
+      pipelineLog(`🔵 SENTINEL: Asking Claude to find emails for ${track1.length} businesses...`,'i');
       setNodeStatus('SENTINEL','RUNNING');
       STATE.sentinelFound=0;
+      let creditsGone=false;
       for(const lead of track1){
-        if(pipelineStopped)break;
-        let found=null;
-        const searches=[
-          `https://html.duckduckgo.com/html/?q=${encodeURIComponent('"'+lead.name+'" '+lead.location+' email')}`,
-          `https://www.yell.com/s/${encodeURIComponent(lead.name)}-${encodeURIComponent(lead.location||'uk')}.html`,
-          `https://www.bing.com/search?q=${encodeURIComponent(lead.name+' '+lead.location+' contact email')}`,
-          `https://www.scoot.co.uk/find/${encodeURIComponent(lead.name+' '+lead.location)}`
-        ];
-        for(const url of searches){
-          if(found)break;
-          try{
-            const d=await workerFetch('scrape_url',{url});
-            if(d.ok){const emails=extractEmails(d.html);if(emails[0])found=emails[0];}
-          }catch{}
-          await new Promise(r=>setTimeout(r,300));
+        if(pipelineStopped||creditsGone)break;
+        try{
+          const d=await workerFetch('search_email',{
+            business_name:lead.name||lead.Name||'',
+            location:lead.location||lead.Location||'',
+            niche:lead.niche||lead.Niche||'',
+            website:lead.website||lead.Website||''
+          });
+          if(d.no_credits){
+            pipelineLog(`🔵 SENTINEL: No Anthropic credits — top up to enable Claude email search`,'w');
+            creditsGone=true;
+            break;
+          }
+          if(d.ok&&d.email){
+            STATE.sentinelFound++;
+            lead.email=d.email;lead.Email_found=true;lead.Lead_temp='WARM';
+            if(lead.id)await sbUpdate('scout_leads',lead.id,{'Email':d.email,'Email_found':true,'Lead_temp':'WARM'});
+            STATE.binned=STATE.binned.filter(b=>b.name!==lead.name);
+            STATE.leads.push({...lead,email:d.email});
+            STATE.stats.leads=STATE.leads.length;updateBottomBar();
+            pipelineLog(`🔵 SENTINEL→SCOUT: ${lead.name} → ${d.email}`,'s');
+            triggerParallelPipeline({...lead,email:d.email});
+          } else {
+            lead.blacklisted=true;
+            pipelineLog(`🔵 SENTINEL: No email found — blacklisted: ${lead.name}`,'w');
+            try{ await sbInsert('scanner_log',{business_name:lead.name,location:lead.location||'',niche:lead.niche||'',status:'blacklisted',created_at:new Date().toISOString()}); }catch{}
+          }
+        }catch(e){
+          pipelineLog(`🔵 SENTINEL error on ${lead.name}: ${e.message}`,'e');
         }
-        if(found){
-          STATE.sentinelFound++;
-          // Update lead with email and send BACK to Scout → Forge pipeline
-          lead.email=found;
-          lead.Email_found=true;
-          lead.Lead_temp='WARM';
-          if(lead.id)await sbUpdate('scout_leads',lead.id,{'Email':found,'Email_found':true,'Lead_temp':'WARM'});
-          STATE.binned=STATE.binned.filter(b=>b.name!==lead.name);
-          STATE.leads.push({...lead,email:found});
-          STATE.stats.leads=STATE.leads.length;updateBottomBar();
-          pipelineLog(`🔵 SENTINEL→SCOUT: ${lead.name} → ${found}`,'s');
-          // Send back into pipeline
-          triggerParallelPipeline({...lead,email:found});
-        } else {
-          // No email found — stays in blacklist
-          lead.blacklisted=true;
-          pipelineLog(`🔵 SENTINEL: No email found — blacklisted: ${lead.name}`,'w');
-          // Persist to Supabase
-          try{ await sbInsert('scanner_log',{business_name:lead.name,location:lead.location||'',niche:lead.niche||'',status:'blacklisted',created_at:new Date().toISOString()}); }catch{}
-        }
-        await new Promise(r=>setTimeout(r,400));
+        await new Promise(r=>setTimeout(r,1500));
       }
       setNodeStatus('SENTINEL','DONE');
       pipelineLog(`🔵 SENTINEL: Done — ${STATE.sentinelFound} recovered, ${track1.length-STATE.sentinelFound} blacklisted`,'s');
