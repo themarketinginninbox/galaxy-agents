@@ -824,17 +824,32 @@ document.body.appendChild(activationModal);
 
 let galaxyDemoOn=false;
 function toggleGalaxyDemo(){
-  galaxyDemoOn=!galaxyDemoOn;
-  const btn=document.getElementById('galaxy-demo-toggle');
-  const lbl=document.getElementById('galaxy-demo-label');
-  const inp=document.getElementById('galaxy-demo-email');
-  btn.style.background=galaxyDemoOn?'#FFAA00':'rgba(255,255,255,0.1)';
-  btn.style.setProperty('--after-left',galaxyDemoOn?'19px':'3px');
-  lbl.textContent=galaxyDemoOn?'ON — emails go to demo address':'OFF — sends to real businesses';
-  inp.style.display=galaxyDemoOn?'block':'none';
+  // Turning demo OFF while single demo is on — turn single demo off too
+  if(galaxyDemoOn && singleDemoMode){
+    singleDemoMode=false;
+    const check=document.getElementById('single-demo-check');
+    const note=document.getElementById('single-demo-note');
+    const wrap=document.getElementById('single-demo-wrap');
+    if(check){ check.innerHTML=''; check.style.background='transparent'; check.style.borderColor='rgba(0,255,136,0.4)'; }
+    if(note) note.style.display='none';
+    if(wrap) wrap.style.borderColor='rgba(0,255,136,0.15)';
+  }
+  setDemoModeUI(!galaxyDemoOn);
 }
 
 let singleDemoMode=false;
+
+function setDemoModeUI(on){
+  // Updates demo toggle UI without triggering toggleGalaxyDemo logic loops
+  galaxyDemoOn=on;
+  const btn=document.getElementById('galaxy-demo-toggle');
+  const lbl=document.getElementById('galaxy-demo-label');
+  const inp=document.getElementById('galaxy-demo-email');
+  if(btn) btn.style.background=on?'#FFAA00':'rgba(255,255,255,0.1)';
+  if(lbl) lbl.textContent=on?'ON — emails go to demo address':'OFF — sends to real businesses';
+  if(inp) inp.style.display=on?'block':'none';
+}
+
 function toggleSingleDemo(){
   singleDemoMode=!singleDemoMode;
   const check=document.getElementById('single-demo-check');
@@ -847,6 +862,9 @@ function toggleSingleDemo(){
   }
   if(note) note.style.display=singleDemoMode?'block':'none';
   if(wrap) wrap.style.borderColor=singleDemoMode?'rgba(0,255,136,0.4)':'rgba(0,255,136,0.15)';
+  // Single demo ON → always activate demo mode too
+  if(singleDemoMode && !galaxyDemoOn) setDemoModeUI(true);
+  // Single demo OFF → leave demo mode as is (user controls that independently)
 }
 
 // Galaxy AC
