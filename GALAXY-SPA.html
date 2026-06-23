@@ -1195,18 +1195,28 @@ async function confirmActivation(){
 
   pipelineRunning=false;
   SESSION_QUEUE=[];
+  singleDemoMode=false;
   pipelineLog(`✅ ALL SESSIONS COMPLETE`,'s');
   addLog('SAM',`All ${total} sessions complete`,'s');
   const completePill=document.getElementById('pipeline-pill');
-  if(completePill) completePill.textContent='✅ GALAXY COMPLETE — tap to view log';
-  const restorePill=document.getElementById('pipeline-restore-pill');
-  if(pill) pill.style.display='none';
+  if(completePill){ completePill.textContent='✅ GALAXY COMPLETE — tap to view log'; }
+  const restorePill2=document.getElementById('pipeline-restore-pill');
+  if(restorePill2) restorePill2.style.display='none';
 
-  // Reset switch and hide overlays after 3s
+  // Auto reset switch and close everything after 3s
   setTimeout(()=>{
     resetSwitch();
     hidePipelineToast();
-    document.getElementById('pipeline-mini-log').classList.remove('visible');
+    activationModal.style.display='none';
+    const miniLog=document.getElementById('pipeline-mini-log');
+    if(miniLog) miniLog.classList.remove('visible');
+    // Reset single demo checkbox
+    const check=document.getElementById('single-demo-check');
+    const note=document.getElementById('single-demo-note');
+    const wrap=document.getElementById('single-demo-wrap');
+    if(check){ check.innerHTML=''; check.style.background='transparent'; }
+    if(note) note.style.display='none';
+    if(wrap) wrap.style.borderColor='rgba(0,255,136,0.15)';
   },3000);
 }
 
