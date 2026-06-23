@@ -1096,7 +1096,7 @@ async function triggerParallelPipeline(lead){
               if(addData.ok){
                 STATE.sentLog.push({business_name:l.name,to:toEmail,live_url:url});
                 STATE.stats.sent++;updateBottomBar();
-                pipelineLog(`🟠 DISPATCH: Queued → ${toEmail}`,'s');
+                pipelineLog(`🟠 DISPATCH: Dispatched → ${toEmail}`,'s');
                 if(launchRow?.id)await sbUpdate('dispatch_queue',launchRow.id,{status:'sent',sent_at:new Date().toISOString()});
               } else {
                 pipelineLog(`🟠 DISPATCH: Lead error — ${JSON.stringify(addData)}`,'e');
@@ -1327,6 +1327,8 @@ async function runScoutForPipeline(location, niche){
           // No email found — stays in blacklist
           lead.blacklisted=true;
           pipelineLog(`🔵 SENTINEL: No email found — blacklisted: ${lead.name}`,'w');
+          // Persist to Supabase
+          try{ await sbInsert('scanner_log',{business_name:lead.name,location:lead.location||'',niche:lead.niche||'',status:'blacklisted',created_at:new Date().toISOString()}); }catch{}
         }
         await new Promise(r=>setTimeout(r,400));
       }
@@ -1400,7 +1402,26 @@ async function runLaunchForPipeline(){
         item.launch_id=saved?.id;
         await sbUpdate('forge_output',item.id,{status:'deployed'});
         item.status='live';STATE.stats.live++;updateBottomBar();
-        pipelineLog(`LAUNCH: Live ${item.business_name}`,'i');
+        pipelineLog(`🟢 LAUNCH: ✅ LIVE — ${url}`,'s');
+
+        // Poll until GitHub Pages is actually responding (max 3 mins)
+        pipelineLog(`🟢 LAUNCH: Waiting for GitHub Pages to propagate...`,'i');
+        let pageReady=false;
+        for(let attempt=0;attempt<18;attempt++){
+          if(pipelineStopped)break;
+          await new Promise(r=>setTimeout(r,10000)); // wait 10s per attempt
+          try{
+            const check=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,{signal:AbortSignal.timeout(8000)});
+            const cd=await check.json();
+            if(cd?.status?.http_code===200||(cd?.contents?.length>100)){
+              pageReady=true;
+              pipelineLog(`🟢 LAUNCH: ${item.business_name} confirmed live after ${(attempt+1)*10}s`,'s');
+              break;
+            }
+          }catch{}
+          pipelineLog(`🟢 LAUNCH: Still propagating... (${(attempt+1)*10}s)`,'i');
+        }
+        if(!pageReady) pipelineLog(`🟢 LAUNCH: ${item.business_name} — propagation timeout, passing to SCANNER anyway`,'w');
       }catch(e){item.status='failed';pipelineLog(`LAUNCH failed: ${item.business_name}`,'e')}
       await new Promise(r=>setTimeout(r,2000));
     }
@@ -1834,10 +1855,30 @@ function signOut(){
 }
 
 // Check session on load
-checkSession().then(valid=>{
+checkSession().then(async valid=>{
   if(valid){
     document.getElementById('login-overlay').style.display='none';
     loadSavedKeys();
+    // Load persisted blacklist from Supabase
+    try{
+      const bl=await sbGet('scanner_log','status=eq.blacklisted&order=created_at.desc&limit=200&select=*');
+      if(bl&&bl.length){
+        const existing=new Set(STATE.binned.map(b=>b.name));
+        bl.forEach(row=>{
+          if(!existing.has(row.business_name)){
+            STATE.binned.push({
+              name:row.business_name,
+              location:row.location||'',
+              niche:row.niche||'',
+              blacklisted:true,
+              track:1,
+              attempted:'Loaded from Supabase'
+            });
+          }
+        });
+        addLog('SENTINEL',`Loaded ${bl.length} blacklisted businesses from Supabase`,'i');
+      }
+    }catch(e){console.warn('Blacklist load failed:',e.message)}
   }
   // If not valid, login overlay stays visible
 });
@@ -1884,7 +1925,7 @@ function renderAgentStatsOnly(id){
     case 'FORGE': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.forgeQueue.filter(i=>i.status==='queued').length}</span><span class="l">QUEUED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">${STATE.forgeQueue.filter(i=>i.status==='building').length}</span><span class="l">BUILDING</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.forgeQueue.filter(i=>i.status==='saved').length}</span><span class="l">BUILT</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.forgeQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div></div>`;
     case 'LAUNCH': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.launchQueue.filter(i=>i.status==='queued').length}</span><span class="l">QUEUED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">${STATE.launchQueue.filter(i=>i.status==='deploying').length}</span><span class="l">DEPLOYING</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.launchQueue.filter(i=>i.status==='live').length}</span><span class="l">LIVE</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.launchQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div></div>`;
     case 'SCANNER': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--scanner)">${STATE.scannerQueue.length}</span><span class="l">TOTAL</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.scannerQueue.filter(i=>i.status==='approved').length}</span><span class="l">APPROVED</span></div><div class="p-stat"><span class="v" style="color:var(--red)">${STATE.scannerQueue.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.scannerQueue.filter(i=>i.status==='requeued').length}</span><span class="l">REQUEUED</span></div></div>`;
-    case 'DISPATCH': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--dispatch)">${STATE.dispatchQueue.length}</span><span class="l">IN QUEUE</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">SENT</span></div><div class="p-stat"><span class="v" style="color:var(--red)">0</span><span class="l">BOUNCED</span></div><div class="p-stat"><span class="v" style="color:var(--green)">0</span><span class="l">CONVERTED</span></div></div>`;
+    case 'DISPATCH': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.dispatchQueue.filter(i=>!STATE.sentLog.find(s=>s.business_name===i.business_name)).length}</span><span class="l">PENDING</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">DISPATCHED</span></div><div class="p-stat"><span class="v" style="color:var(--red)">0</span><span class="l">BOUNCED</span></div><div class="p-stat"><span class="v" style="color:var(--green)">0</span><span class="l">CONVERTED</span></div></div>`;
     case 'SENTINEL': return `<div class="p-stats"><div class="p-stat"><span class="v" style="color:var(--sentinel)">${STATE.binned.length}</span><span class="l">IN BIN</span></div><div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentinelFound||0}</span><span class="l">RECOVERED</span></div><div class="p-stat"><span class="v" style="color:var(--blue)">1</span><span class="l">DOMAINS</span></div><div class="p-stat"><span class="v" style="color:var(--green)">9.8</span><span class="l">HEALTH</span></div></div>`;
     default: return '';
   }
@@ -2212,8 +2253,8 @@ function renderDispatchPanel(){
   const workerUrl=getWorkerUrl();
   return `
   <div class="p-stats">
-    <div class="p-stat"><span class="v" style="color:var(--dispatch)">${STATE.dispatchQueue.length}</span><span class="l">IN QUEUE</span></div>
-    <div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">SENT</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--amber)">${STATE.dispatchQueue.filter(i=>!STATE.sentLog.find(s=>s.business_name===i.business_name)).length}</span><span class="l">PENDING</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">DISPATCHED</span></div>
     <div class="p-stat"><span class="v" style="color:var(--red)">0</span><span class="l">BOUNCED</span></div>
     <div class="p-stat"><span class="v" style="color:var(--green)">0</span><span class="l">CONVERTED</span></div>
   </div>
@@ -2266,7 +2307,7 @@ function renderDispatchPanel(){
     <div style="overflow-x:auto;max-height:150px;overflow-y:auto">
       <table class="p-table">
         <thead><tr><th>Business</th><th>Email</th><th>Status</th></tr></thead>
-        <tbody>${STATE.sentLog.length?STATE.sentLog.slice(0,15).map(i=>`<tr><td style="color:#fff">${i.business_name||'—'}</td><td style="font-size:8px">${i.to||'—'}</td><td><span class="badge ok">QUEUED</span></td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO SENDS YET</div></td></tr>'}</tbody>
+        <tbody>${STATE.sentLog.length?STATE.sentLog.slice(0,15).map(i=>`<tr><td style="color:#fff">${i.business_name||'—'}</td><td style="font-size:8px">${i.to||'—'}</td><td><span class="badge ok">DISPATCHED</span></td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO SENDS YET</div></td></tr>'}</tbody>
       </table>
     </div>
   </div>`;
@@ -2953,7 +2994,7 @@ async function startForge(){
 }
 
 // ═══════════════════════════════════════════
-// LAUNCH LOGIC — Netlify API
+// LAUNCH LOGIC — GitHub Pages
 // ═══════════════════════════════════════════
 function getNetlifyToken(){return STATE.netlifyToken||localStorage.getItem('galaxy_netlify_token')||''}
 function slugify(n){return n.toLowerCase().replace(/[^a-z0-9\s]/g,'').trim().replace(/\s+/g,'-').slice(0,40)}
@@ -3063,12 +3104,12 @@ async function cloudflarePagesDeploy(siteName, html){
 async function startLaunch(){
   STATE.launchRunning=true;STATE.launchStopped=false;
   setNodeStatus('LAUNCH','RUNNING');
-  addLog('LAUNCH','Launch started — Netlify deploy','s');
+  addLog('LAUNCH','Launch started — GitHub Pages deploy','s');
   if(currentAgent?.id==='LAUNCH')renderAgentPanel('LAUNCH');
 
   const netlifyToken=getNetlifyToken();
   if(!netlifyToken){
-    addLog('LAUNCH','❌ No Netlify token — open Settings and add it','e');
+    addLog('LAUNCH','❌ No Netlify token — open Settings and add it','e'); // legacy
     STATE.launchRunning=false;setNodeStatus('LAUNCH','IDLE');return;
   }
 
@@ -3087,7 +3128,7 @@ async function startLaunch(){
 
       try{
         const siteName=`galaxy-${slugify(item.business_name)}`;
-        addLog('LAUNCH',`Deploying ${item.business_name} to Netlify...`,'i');
+        addLog('LAUNCH',`Deploying ${item.business_name} to GitHub Pages...`,'i');
         const url=await netlifyFileDeploy(siteName,item.html);
         item.url=url;
 
@@ -3422,7 +3463,12 @@ async function startDispatch(){
       if(currentAgent?.id==='DISPATCH')renderAgentPanel('DISPATCH');
       if(i<items.length-1&&!STATE.dispatchStopped){
         addLog('DISPATCH',`Waiting ${delay/1000}s...`,'i');
-        await new Promise(r=>setTimeout(r,delay));
+        // Interruptible delay — checks stop flag every 500ms
+        const chunks=Math.ceil(delay/500);
+        for(let c=0;c<chunks;c++){
+          if(STATE.dispatchStopped)break;
+          await new Promise(r=>setTimeout(r,Math.min(500,delay-c*500)));
+        }
       }
     }
     addLog('DISPATCH',`Done. ${STATE.sentLog.length} leads queued in Instantly`,'s');
