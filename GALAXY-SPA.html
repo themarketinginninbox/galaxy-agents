@@ -1210,18 +1210,12 @@ async function runTestPipeline(){
     const campaignId=STATE.instantlyCampaignId||localStorage.getItem('galaxy_instantly_campaign_id');
     if(!campaignId) throw new Error('No campaign ID — run DISPATCH once first to create campaign');
 
-    const r=await fetch(workerUrl,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        action:'add_lead',
-        campaign_id:campaignId,
-        email:demoEmail,
-        business_name:testLead.name,
-        live_url:liveUrl
-      })
+    const d=await workerFetch('add_lead',{
+      campaign_id:campaignId,
+      email:demoEmail,
+      business_name:testLead.name,
+      live_url:liveUrl
     });
-    const d=await r.json();
     if(d.ok){
       pipelineLog(`🟠 DISPATCH — test email dispatched to ${demoEmail} ✅`,'s');
       STATE.stats.sent=1;
