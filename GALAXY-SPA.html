@@ -2043,25 +2043,27 @@ function renderScannerPanel(){
   <div class="p-log" id="log-SCANNER"></div>
 
   <!-- Phase 1 Intel Table -->
-  ${p1.length?`
+  <!-- Phase 1 Intel Table — always shown, uses dedicated STATE.scannerIntel store -->
   <div class="p-table-wrap" style="margin-bottom:8px">
-    <div class="p-table-head" style="color:#00B4D8">PHASE 1 — VERIFIED INTEL (${p1.length})</div>
+    <div class="p-table-head" style="color:#00B4D8">PHASE 1 — VERIFIED INTEL (${(STATE.scannerIntel||[]).length})</div>
     <div style="overflow-x:auto;max-height:160px;overflow-y:auto">
       <table class="p-table">
         <thead><tr><th>Business</th><th>Niche</th><th>Template</th><th>Data</th></tr></thead>
-        <tbody>${p1.slice(0,15).map(l=>{
-          const si=l.scanner_intel||{};
-          const nc=nicheColor[si.detected_niche]||'#00B4D8';
-          return `<tr>
-            <td style="color:#fff">${l.name||'—'}</td>
-            <td><span style="font-size:7px;padding:2px 5px;border-radius:3px;background:${nc}22;color:${nc};border:1px solid ${nc}44">${si.detected_niche||'—'}</span></td>
-            <td style="font-size:8px;color:rgba(192,200,216,0.6)">${si.template||'—'}</td>
-            <td style="font-size:8px">${si.phone?'📞':''} ${si.email?'📧':''}</td>
-          </tr>`;
-        }).join('')}</tbody>
+        <tbody>${(STATE.scannerIntel||[]).length
+          ?(STATE.scannerIntel).slice(0,15).map(si=>{
+            const nc=nicheColor[si.detected_niche]||'#00B4D8';
+            return `<tr>
+              <td style="color:#fff">${si.name||'—'}</td>
+              <td><span style="font-size:7px;padding:2px 5px;border-radius:3px;background:${nc}22;color:${nc};border:1px solid ${nc}44">${si.detected_niche||'—'}</span></td>
+              <td style="font-size:8px;color:rgba(192,200,216,0.6)">${si.template||'—'}</td>
+              <td style="font-size:8px">${si.phone?'📞':''} ${si.email?'📧':''}</td>
+            </tr>`;
+          }).join('')
+          :'<tr><td colspan="4"><div class="p-empty">⬡ AWAITING PHASE 1</div></td></tr>'
+        }</tbody>
       </table>
     </div>
-  </div>`:''}
+  </div>
 
   <!-- Phase 2 Proof Table -->
   <div class="p-table-wrap">
@@ -2070,7 +2072,7 @@ function renderScannerPanel(){
       <table class="p-table">
         <thead><tr><th>Business</th><th>Checks</th><th>Result</th></tr></thead>
         <tbody>${q.length?q.slice(0,15).map(i=>`<tr>
-          <td style="color:#fff">${i.business_name||'—'}</td>
+          <td style="color:#fff">${i.business_name||i.name||'—'}</td>
           <td style="font-size:8px">${i.checks?Object.values(i.checks).filter(Boolean).length+'/4':'—'}</td>
           <td><span class="badge ${i.status==='approved'?'ok':i.status==='failed'?'fail':'pend'}">${i.status?.toUpperCase()||'—'}</span></td>
         </tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ AWAITING PHASE 2</div></td></tr>'}</tbody>
@@ -2193,24 +2195,117 @@ async function addBlacklistEmail(idx, name, location, address, phone){
 
 // SAM PANEL
 function renderSAMPanel(){
+  const replies = STATE.samReplies || [];
+  const newReplies = replies.filter(r=>!r.seen);
   return `
   <div class="p-stats">
-    <div class="p-stat"><span class="v" style="color:var(--sam)">${STATE.leads.length}</span><span class="l">TOTAL LEADS</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--sam)">${STATE.leads.length}</span><span class="l">LEADS</span></div>
     <div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">CONTACTED</span></div>
-    <div class="p-stat"><span class="v" style="color:var(--gold)">0</span><span class="l">REPLIED</span></div>
-    <div class="p-stat"><span class="v" style="color:var(--amber)">0</span><span class="l">CLOSED</span></div>
+    <div class="p-stat"><span class="v" style="color:${newReplies.length?'#FF3355':'var(--gold)'}">${replies.length}</span><span class="l">REPLIES</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">${STATE.leads.filter(l=>l.lead_temp==='HOT').length}</span><span class="l">HOT</span></div>
   </div>
-  <div class="pipeline-note">🟣 SAM tracks all confirmed sends, manages the CRM, and builds the call list for warm leads. Full build coming soon.</div>
-  <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:8px">CALL LIST — HOT LEADS</div>
-  <div class="p-table-wrap">
-    <div style="overflow-x:auto;max-height:200px;overflow-y:auto">
+
+  <!-- Reply monitor -->
+  <div style="border:1px solid rgba(255,51,85,0.2);border-radius:6px;padding:10px;margin-bottom:12px;background:rgba(255,51,85,0.04)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:8px;letter-spacing:2px;color:#FF3355">📬 REPLY MONITOR</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        ${STATE.samPolling?'<div style="font-size:7px;color:rgba(192,200,216,0.4);animation:pulse 2s infinite">● WATCHING</div>':''}
+        <button onclick="samCheckReplies()" style="background:rgba(255,51,85,0.1);border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-size:8px;padding:4px 10px;cursor:pointer;font-family:'Share Tech Mono',monospace">CHECK NOW</button>
+        <button onclick="samTogglePolling()" style="background:${STATE.samPolling?'rgba(0,255,136,0.1)':'rgba(0,180,216,0.1)'};border:1px solid ${STATE.samPolling?'rgba(0,255,136,0.3)':'rgba(0,180,216,0.3)'};border-radius:4px;color:${STATE.samPolling?'#00FF88':'#00B4D8'};font-size:8px;padding:4px 10px;cursor:pointer;font-family:'Share Tech Mono',monospace">${STATE.samPolling?'⬛ STOP':'▶ AUTO'}</button>
+      </div>
+    </div>
+    ${replies.length?replies.slice(0,5).map(r=>`
+      <div style="border:1px solid rgba(255,51,85,${r.seen?'0.08':'0.25'});border-radius:4px;padding:8px;margin-bottom:6px;background:rgba(255,51,85,${r.seen?'0.02':'0.06'})">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:9px;color:${r.seen?'rgba(192,200,216,0.6)':'#fff'};font-weight:${r.seen?'300':'500'}">${r.from_name||r.from_email||'Unknown'}</div>
+          ${!r.seen?'<div style="font-size:7px;padding:2px 6px;background:rgba(255,51,85,0.2);border-radius:3px;color:#FF3355">NEW</div>':''}
+        </div>
+        <div style="font-size:8px;color:rgba(192,200,216,0.5);margin-bottom:4px">${r.from_email}</div>
+        <div style="font-size:8px;color:rgba(192,200,216,0.7);line-height:1.5">${r.preview||'No preview'}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+          <div style="font-size:7px;color:rgba(192,200,216,0.3)">${r.timestamp?new Date(r.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>
+          <button onclick="samMarkSeen('${r.id}')" style="background:transparent;border:1px solid rgba(192,200,216,0.2);border-radius:3px;color:rgba(192,200,216,0.4);font-size:7px;padding:2px 6px;cursor:pointer;font-family:'Share Tech Mono',monospace">MARK READ</button>
+        </div>
+      </div>`).join('')
+    :'<div style="font-size:8px;color:rgba(192,200,216,0.3);text-align:center;padding:12px 0">No replies yet — SAM is watching</div>'}
+  </div>
+
+  <!-- Hot leads call list -->
+  <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:8px">🔥 HOT LEADS — CALL LIST</div>
+  <div class="p-table-wrap" style="margin-bottom:8px">
+    <div style="overflow-x:auto;max-height:160px;overflow-y:auto">
       <table class="p-table">
         <thead><tr><th>Business</th><th>Phone</th><th>Area</th></tr></thead>
-        <tbody>${STATE.leads.filter(l=>l.lead_temp==='HOT').length?STATE.leads.filter(l=>l.lead_temp==='HOT').slice(0,20).map(l=>`<tr><td style="color:#fff">${l.name||'—'}</td><td>${l.phone||'—'}</td><td>${l.location||'—'}</td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO HOT LEADS YET</div></td></tr>'}</tbody>
+        <tbody>${STATE.leads.filter(l=>l.lead_temp==='HOT').length
+          ?STATE.leads.filter(l=>l.lead_temp==='HOT').slice(0,20).map(l=>`<tr><td style="color:#fff">${l.name||'—'}</td><td>${l.phone||'—'}</td><td>${l.location||'—'}</td></tr>`).join('')
+          :'<tr><td colspan="3"><div class="p-empty">⬡ NO HOT LEADS YET</div></td></tr>'
+        }</tbody>
       </table>
     </div>
   </div>
   <div class="p-log" id="log-SAM"></div>`;
+}
+
+// ── SAM REPLY FUNCTIONS ──────────────────────
+STATE.samReplies = STATE.samReplies || [];
+STATE.samPolling = false;
+STATE.samPollInterval = null;
+
+async function samCheckReplies(){
+  addLog('SAM','Checking Instantly for replies...','i');
+  try{
+    const campaignId = localStorage.getItem('galaxy_instantly_campaign_id') || STATE.instantlyCampaignId;
+    if(!campaignId){ addLog('SAM','No campaign ID found — run DISPATCH first','w'); return; }
+
+    const d = await workerFetch('check_replies',{ campaign_id: campaignId, limit: 20 });
+
+    if(!d.ok){ addLog('SAM',`Reply check failed: ${d.error}`,'e'); return; }
+
+    if(!d.replies || !d.replies.length){
+      addLog('SAM','No replies found','i');
+      if(currentAgent?.id==='SAM') renderAgentPanel('SAM');
+      return;
+    }
+
+    // Merge new replies — don't duplicate by id
+    const existing = new Set((STATE.samReplies||[]).map(r=>r.id));
+    const newOnes = d.replies.filter(r=>!existing.has(r.id)).map(r=>({...r, seen:false}));
+
+    if(newOnes.length){
+      STATE.samReplies = [...newOnes, ...(STATE.samReplies||[])];
+      addLog('SAM',`🔴 ${newOnes.length} NEW REPL${newOnes.length===1?'Y':'IES'} — check inbox!`,'s');
+      // Flash the SAM node
+      const node = document.querySelector('[data-id="SAM"] .node-orb');
+      if(node){ node.style.boxShadow='0 0 20px #FF3355'; setTimeout(()=>node.style.boxShadow='',3000); }
+      showPipelineToast(`📬 ${newOnes.length} new repl${newOnes.length===1?'y':'ies'} received!`);
+    } else {
+      addLog('SAM',`No new replies (${d.replies.length} total checked)`,'i');
+    }
+
+    if(currentAgent?.id==='SAM') renderAgentPanel('SAM');
+  }catch(e){
+    addLog('SAM',`Error: ${e.message}`,'e');
+  }
+}
+
+function samMarkSeen(id){
+  STATE.samReplies = (STATE.samReplies||[]).map(r=>r.id===id?{...r,seen:true}:r);
+  if(currentAgent?.id==='SAM') renderAgentPanel('SAM');
+}
+
+function samTogglePolling(){
+  if(STATE.samPolling){
+    clearInterval(STATE.samPollInterval);
+    STATE.samPolling = false;
+    addLog('SAM','Reply monitor stopped','w');
+  } else {
+    STATE.samPolling = true;
+    addLog('SAM','Reply monitor active — checking every 5 mins','s');
+    samCheckReplies();
+    STATE.samPollInterval = setInterval(samCheckReplies, 5 * 60 * 1000);
+  }
+  if(currentAgent?.id==='SAM') renderAgentPanel('SAM');
 }
 
 // ═══════════════════════════════════════════
@@ -2936,6 +3031,7 @@ function mapNicheToTemplate(niche){
 
 async function runScannerPhase1(){
   STATE.scannerPhase=1;
+  STATE.scannerIntel = [];
   setNodeStatus('SCANNER','RUNNING');
   addLog('SCANNER','Phase 1 — verifying niches and scraping business intel','s');
   if(currentAgent?.id==='SCANNER')renderAgentPanel('SCANNER');
@@ -3006,6 +3102,15 @@ async function runScannerPhase1(){
       addLog('SCANNER',`📧 Bonus email found for ${name}: ${intel.email}`,'s');
     }
 
+    // Store in dedicated intel log for panel display
+    STATE.scannerIntel = STATE.scannerIntel || [];
+    STATE.scannerIntel.push({
+      name,
+      detected_niche: detectedNiche,
+      template: templateToUse,
+      phone: intel.phone || lead.phone || '',
+      email: intel.email || lead.email || ''
+    });
     addLog('SCANNER',`✅ ${name} — niche: ${detectedNiche} → template: ${templateToUse}`,'s');
 
     // Update Supabase with verified niche
@@ -3115,6 +3220,9 @@ async function getOrCreateCampaign(){
   const d=await workerFetch('get_campaign');
   if(d.ok){
     addLog('DISPATCH',`Campaign ${d.created?'created':'found'}: ${d.campaign_id}`,'s');
+    // Store for SAM reply monitor
+    STATE.instantlyCampaignId = d.campaign_id;
+    localStorage.setItem('galaxy_instantly_campaign_id', d.campaign_id);
     return d.campaign_id;
   }
   addLog('DISPATCH',`Campaign error: ${JSON.stringify(d.error)}`,'e');
