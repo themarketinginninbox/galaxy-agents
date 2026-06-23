@@ -953,10 +953,20 @@ function minimiseActivationModal(){
   pill.style.display='block';
 }
 function closeActivationModal(){
+  activationModal.style.display='none';
   if(!pipelineRunning){
-    activationModal.style.display='none';
     galaxyDemoOn=false;
+    singleDemoMode=false;
     resetSwitch();
+    // Reset single demo checkbox UI
+    const check=document.getElementById('single-demo-check');
+    const note=document.getElementById('single-demo-note');
+    const wrap=document.getElementById('single-demo-wrap');
+    if(check){ check.innerHTML=''; check.style.background='transparent'; check.style.borderColor='rgba(0,255,136,0.4)'; }
+    if(note) note.style.display='none';
+    if(wrap) wrap.style.borderColor='rgba(0,255,136,0.15)';
+    // Reset demo toggle UI
+    setDemoModeUI(false);
   }
 }
 
@@ -980,7 +990,7 @@ function stopPipeline(){
   STATE.launchStopped=true;
   STATE.scannerStopped=true;
   STATE.dispatchStopped=true;
-  pipelineLog('⬛ PIPELINE STOPPED BY USER','w');
+  if(pipelineRunning) pipelineLog('⬛ PIPELINE STOPPED BY USER','w');
   pipelineRunning=false;
   setNodeStatus('SCOUT','IDLE');
   setNodeStatus('FORGE','IDLE');
@@ -990,7 +1000,8 @@ function stopPipeline(){
   setTimeout(()=>{
     activationModal.style.display='none';
     document.getElementById('pipeline-status').style.display='none';
-  },2000);
+    resetSwitch();
+  },1000);
 }
 
 async function runSingleSession(location, niche, sessionNum, totalSessions){
@@ -1691,14 +1702,14 @@ let machineOn = false;
 function toggleMachineSwitch(){
   if(machineOn){
     // TURN OFF
-    machineOn = false;
-    document.getElementById('machine-switch').classList.remove('on');
-    document.getElementById('switch-glow').classList.remove('on');
-    document.getElementById('switch-state').classList.remove('on');
-    document.getElementById('switch-state').textContent = 'OFF';
-    stopPipeline();
+    if(pipelineRunning){
+      stopPipeline();
+    }
+    resetSwitch();
+    activationModal.style.display='none';
   } else {
-    // TURN ON — show activation modal
+    // TURN ON — show activation modal only if not already visible
+    if(activationModal.style.display==='flex') return;
     machineOn = true;
     document.getElementById('machine-switch').classList.add('on');
     document.getElementById('switch-glow').classList.add('on');
