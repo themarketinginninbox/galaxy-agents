@@ -881,25 +881,31 @@ async function confirmActivation(){
   if(pipelineStopped)return;
   pipelineLog(`🔵 SCOUT complete — ${STATE.leads.length} leads found`,'s');
 
-  // ── STAGE 2: FORGE ──
+  // ── STAGE 2: SCANNER (Phase 1 — Intelligence) ──
+  pipelineLog('🟤 SCANNER initiating — intelligence phase...','i');
+  await runScannerPhase1();
+  if(pipelineStopped)return;
+  pipelineLog(`🟤 SCANNER Phase 1 complete — niches verified`,'s');
+
+  // ── STAGE 3: FORGE ──
   pipelineLog('🔴 FORGE initiating...','i');
   await runForgeForPipeline();
   if(pipelineStopped)return;
   pipelineLog(`🔴 FORGE complete — ${STATE.forgeQueue.filter(i=>i.status==='saved').length} sites built`,'s');
 
-  // ── STAGE 3: LAUNCH ──
+  // ── STAGE 4: LAUNCH ──
   pipelineLog('🟢 LAUNCH initiating...','i');
   await runLaunchForPipeline();
   if(pipelineStopped)return;
   pipelineLog(`🟢 LAUNCH complete — ${STATE.launchQueue.filter(i=>i.status==='live').length} sites live`,'s');
 
-  // ── STAGE 4: SCANNER ──
-  pipelineLog('🟤 SCANNER initiating...','i');
+  // ── STAGE 5: SCANNER (Phase 2 — Proof) ──
+  pipelineLog('🟤 SCANNER initiating — proof phase...','i');
   await startScanner();
   if(pipelineStopped)return;
-  pipelineLog(`🟤 SCANNER complete — ${STATE.scannerQueue.filter(i=>i.status==='approved').length} approved`,'s');
+  pipelineLog(`🟤 SCANNER Phase 2 complete — ${STATE.scannerQueue.filter(i=>i.status==='approved').length} approved`,'s');
 
-  // ── STAGE 5: DISPATCH ──
+  // ── STAGE 6: DISPATCH ──
   pipelineLog('🟠 DISPATCH initiating...','i');
   await startDispatch();
   pipelineLog(`🟠 DISPATCH complete — ${STATE.sentLog.length} emails sent`,'s');
@@ -2250,22 +2256,27 @@ async function buildSiteWithAI(lead){
 // ═══════════════════════════════════════════
 function buildSiteHTML(lead){
   const name=lead.name||lead.Name||'';
-  const phone=lead.phone||lead.Phone||'';
-  const address=lead.address||'';
+  // Use scanner_intel data if available for richer site
+  const phone=lead.scanner_intel?.phone||lead.phone||lead.Phone||'';
+  const address=lead.address||lead.scanner_intel?.address||'';
   const location=lead.location||lead.Location||'UK';
-  const email=lead.email||lead.Email||'';
-  const niche=(lead.niche||lead.Niche||'').toLowerCase();
+  const email=lead.scanner_intel?.email||lead.email||lead.Email||'';
 
-  if(['hairdresser','beauty','spa','nail','gym'].some(k=>niche.includes(k))){
+  // SCANNER Phase 1 sets template_override — use it directly if present
+  const templateOverride=(lead.template_override||'').toLowerCase();
+  const niche=(lead.niche||lead.scanner_intel?.detected_niche||lead.Niche||'').toLowerCase();
+  const resolvedNiche=templateOverride||niche;
+
+  if(['beauty','salon','hair','spa','nail','gym','fitness','health'].some(k=>resolvedNiche.includes(k))){
     return buildBeautyTemplate(name,phone,address,location,email);
-  } else if(['plumb','electr','build','trade','roofer','carpenter','car_repair','car repair'].some(k=>niche.includes(k))){
+  } else if(['trades','plumb','electr','build','trade','roofer','carpenter','automotive','cleaning'].some(k=>resolvedNiche.includes(k))){
     return buildTradesTemplate(name,phone,address,location,email);
-  } else if(['retail','clothes','clothing','boutique','gift','convenience'].some(k=>niche.includes(k))){
+  } else if(['retail','clothes','clothing','boutique','gift','convenience'].some(k=>resolvedNiche.includes(k))){
     return buildRetailTemplate(name,phone,address,location,email);
-  } else if(['fast_food','fast food','takeaway','kebab','pizza','chicken','chinese','indian','burger','bakery'].some(k=>niche.includes(k))){
+  } else if(['takeaway','fast_food','fast food','kebab','pizza','chicken','chinese','indian','burger','bakery'].some(k=>resolvedNiche.includes(k))){
     return buildTakeawayTemplate(name,phone,address,location,email);
   } else {
-    // restaurant, cafe, bar, pub and everything else → premium restaurant template
+    // cafe, restaurant, bar, pub and everything else → premium restaurant template
     return buildRestaurantTemplate(name,phone,address,location,email);
   }
 }
@@ -2833,6 +2844,136 @@ async function startLaunch(){
 // ═══════════════════════════════════════════
 // SCANNER LOGIC
 // ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+// SCANNER PHASE 1 — INTELLIGENCE (pre-FORGE)
+// ═══════════════════════════════════════════
+
+// Niche keyword map for fallback (no Claude credits)
+const NICHE_KEYWORDS = {
+  restaurant:   ['restaurant','dining','cuisine','bistro','brasserie','eatery','dine'],
+  cafe:         ['cafe','coffee','barista','bakery','brunch','tea room','patisserie'],
+  takeaway:     ['takeaway','take-away','kebab','pizza','burger','chicken','fish and chips','curry','chinese','thai'],
+  beauty:       ['hair','salon','barber','beauty','nails','lashes','brows','spa','waxing','threading'],
+  trades:       ['plumber','electrician','builder','roofer','plasterer','decorator','carpenter','landscaper','handyman','contractor'],
+  retail:       ['shop','store','boutique','clothing','fashion','jewellery','gifts','accessories'],
+  fitness:      ['gym','fitness','yoga','pilates','personal trainer','crossfit','martial arts','boxing'],
+  health:       ['dentist','optician','pharmacy','physiotherapy','chiropractor','osteopath','clinic','therapy'],
+  automotive:   ['garage','car','van','auto','mechanic','mot','tyres','bodywork'],
+  cleaning:     ['cleaning','cleaners','domestic','commercial clean','window clean','carpet clean']
+};
+
+function detectNicheFromText(text){
+  const t = text.toLowerCase();
+  let best = { niche: null, score: 0 };
+  for(const [niche, keywords] of Object.entries(NICHE_KEYWORDS)){
+    const score = keywords.filter(k => t.includes(k)).length;
+    if(score > best.score){ best = { niche, score }; }
+  }
+  return best.niche || 'retail'; // fallback
+}
+
+function mapNicheToTemplate(niche){
+  const map = {
+    restaurant: 'Restaurant', cafe: 'Restaurant', takeaway: 'Takeaway',
+    beauty: 'Beauty', trades: 'Trades', retail: 'Retail',
+    fitness: 'Beauty', health: 'Beauty', automotive: 'Trades', cleaning: 'Trades'
+  };
+  return map[niche] || 'Retail';
+}
+
+async function runScannerPhase1(){
+  setNodeStatus('SCANNER','RUNNING');
+  addLog('SCANNER','Phase 1 — verifying niches and scraping business intel','s');
+  if(currentAgent?.id==='SCANNER')renderAgentPanel('SCANNER');
+
+  if(!STATE.leads || !STATE.leads.length){
+    addLog('SCANNER','No leads to scan — SCOUT must run first','w');
+    setNodeStatus('SCANNER','IDLE');
+    return;
+  }
+
+  for(let i=0; i<STATE.leads.length; i++){
+    if(pipelineStopped) break;
+    const lead = STATE.leads[i];
+    const name = lead.name || lead.Business_name || 'Unknown';
+
+    pBar('SCANNER', Math.round((i+1)/STATE.leads.length*100), `${i+1}/${STATE.leads.length} — ${name}`);
+    addLog('SCANNER',`🔍 Scanning: ${name}`,'i');
+
+    let scrapedText = '';
+    let detectedNiche = lead.niche || lead.Category || '';
+    let intel = {};
+
+    // Scrape their existing website via Worker if they have one
+    if(lead.website || lead.Website){
+      try{
+        const url = lead.website || lead.Website;
+        const d = await workerFetch('scrape_url',{ url });
+        if(d.ok && d.html){
+          scrapedText = d.html.replace(/<[^>]+>/g,'').replace(/\s+/g,' ').slice(0,3000);
+          // Extract phone
+          const phoneMatch = scrapedText.match(/(\+44|0)[0-9][\s\-]?[0-9]{3,4}[\s\-]?[0-9]{3,4}/);
+          if(phoneMatch) intel.phone = phoneMatch[0];
+          // Extract email if SENTINEL hasn't found one yet
+          if(!lead.email){
+            const emailMatch = scrapedText.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+            if(emailMatch) intel.email = emailMatch[0].toLowerCase();
+          }
+          addLog('SCANNER',`✅ Scraped ${name} — ${scrapedText.length} chars`,'s');
+        }
+      }catch(e){
+        addLog('SCANNER',`Scrape failed for ${name}: ${e.message}`,'w');
+      }
+    }
+
+    // Detect niche — keyword match on scraped text + business name
+    const combined = `${name} ${scrapedText} ${lead.Category||''} ${lead.niche||''}`;
+    detectedNiche = detectNicheFromText(combined);
+    const templateToUse = mapNicheToTemplate(detectedNiche);
+
+    // Enrich the lead in STATE with verified intel
+    STATE.leads[i] = {
+      ...lead,
+      niche: detectedNiche,
+      template_override: templateToUse,
+      scanner_intel: {
+        scraped_text: scrapedText.slice(0,500),
+        phone: intel.phone || lead.phone || '',
+        email: intel.email || lead.email || '',
+        detected_niche: detectedNiche,
+        template: templateToUse,
+        scanned_at: new Date().toISOString()
+      }
+    };
+
+    // If we found an email from scraping, update the lead's email too
+    if(intel.email && !lead.email){
+      STATE.leads[i].email = intel.email;
+      addLog('SCANNER',`📧 Bonus email found for ${name}: ${intel.email}`,'s');
+    }
+
+    addLog('SCANNER',`✅ ${name} — niche: ${detectedNiche} → template: ${templateToUse}`,'s');
+
+    // Update Supabase with verified niche
+    if(lead.id){
+      try{
+        await sbUpdate('scout_leads', lead.id, {
+          Category: detectedNiche,
+          scanner_niche: detectedNiche,
+          scanner_template: templateToUse
+        });
+      }catch(e){}
+    }
+
+    if(currentAgent?.id==='SCANNER')renderAgentPanel('SCANNER');
+    await new Promise(r=>setTimeout(r,600));
+  }
+
+  addLog('SCANNER',`Phase 1 complete — ${STATE.leads.length} leads enriched with verified niches`,'s');
+  setNodeStatus('SCANNER','DONE');
+  if(currentAgent?.id==='SCANNER')renderAgentPanel('SCANNER');
+}
+
 async function startScanner(){
   STATE.scannerRunning=true;STATE.scannerStopped=false;
   setNodeStatus('SCANNER','RUNNING');
