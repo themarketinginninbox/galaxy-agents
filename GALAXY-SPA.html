@@ -396,25 +396,31 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
   <span id="switch-state">OFF</span>
 </div>
 
-<!-- SENTINEL + FORGE CREDIT TOGGLES — top right dashboard -->
-<div id="credits-panel" style="position:fixed;top:16px;right:80px;z-index:100;display:flex;gap:10px;align-items:flex-start">
+<!-- SENTINEL + FORGE CREDIT TOGGLES — right side open space -->
+<div id="credits-panel" style="position:fixed;right:130px;top:50%;transform:translateY(-50%);z-index:100;display:flex;flex-direction:column;gap:10px">
 
-  <!-- SENTINEL TOGGLE -->
-  <div style="background:rgba(6,10,24,0.92);border:1px solid rgba(0,180,216,0.2);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:52px">
-    <span style="font-size:7px;letter-spacing:1.5px;color:rgba(0,180,216,0.6);font-family:'Share Tech Mono',monospace">SENT</span>
-    <div onclick="toggleSentinelCredits()" style="width:28px;height:16px;background:rgba(255,255,255,0.06);border-radius:8px;cursor:pointer;position:relative;border:1px solid rgba(0,180,216,0.2);transition:all 0.3s" id="sentinel-credits-track">
-      <div id="sentinel-credits-thumb" style="position:absolute;left:3px;top:2px;width:12px;height:12px;border-radius:6px;background:rgba(0,180,216,0.3);transition:all 0.3s"></div>
+  <!-- SENTINEL TOGGLE BOX -->
+  <div onclick="toggleSentinelCredits()" style="background:rgba(6,10,24,0.92);border:1px solid rgba(0,180,216,0.2);border-radius:8px;padding:12px 16px;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;min-width:110px;cursor:pointer;transition:all 0.3s" id="sentinel-credits-box">
+    <div>
+      <div style="font-size:8px;letter-spacing:2px;color:rgba(0,180,216,0.7);font-family:'Share Tech Mono',monospace;margin-bottom:4px">SENTINEL</div>
+      <div style="font-size:7px;color:rgba(192,200,216,0.3);font-family:'Share Tech Mono',monospace">AI EMAIL</div>
+      <div id="sentinel-credits-state" style="font-size:7px;color:rgba(192,200,216,0.3);font-family:'Share Tech Mono',monospace;margin-top:2px">OFF</div>
     </div>
-    <span id="sentinel-credits-state" style="font-size:6px;color:rgba(192,200,216,0.3);font-family:'Share Tech Mono',monospace">OFF</span>
+    <div id="sentinel-credits-track" style="width:32px;height:18px;background:rgba(255,255,255,0.06);border-radius:9px;position:relative;border:1px solid rgba(0,180,216,0.2);transition:all 0.3s;flex-shrink:0">
+      <div id="sentinel-credits-thumb" style="position:absolute;left:3px;top:3px;width:12px;height:12px;border-radius:6px;background:rgba(0,180,216,0.3);transition:all 0.3s"></div>
+    </div>
   </div>
 
-  <!-- FORGE TOGGLE -->
-  <div style="background:rgba(6,10,24,0.92);border:1px solid rgba(255,51,51,0.2);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:52px">
-    <span style="font-size:7px;letter-spacing:1.5px;color:rgba(255,100,100,0.6);font-family:'Share Tech Mono',monospace">FORG</span>
-    <div onclick="toggleForgeCredits()" style="width:28px;height:16px;background:rgba(255,255,255,0.06);border-radius:8px;cursor:pointer;position:relative;border:1px solid rgba(255,51,51,0.2);transition:all 0.3s" id="forge-credits-track">
-      <div id="forge-credits-thumb" style="position:absolute;left:3px;top:2px;width:12px;height:12px;border-radius:6px;background:rgba(255,100,100,0.3);transition:all 0.3s"></div>
+  <!-- FORGE TOGGLE BOX -->
+  <div onclick="toggleForgeCredits()" style="background:rgba(6,10,24,0.92);border:1px solid rgba(255,80,80,0.2);border-radius:8px;padding:12px 16px;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;min-width:110px;cursor:pointer;transition:all 0.3s" id="forge-credits-box">
+    <div>
+      <div style="font-size:8px;letter-spacing:2px;color:rgba(255,100,100,0.7);font-family:'Share Tech Mono',monospace;margin-bottom:4px">FORGE</div>
+      <div style="font-size:7px;color:rgba(192,200,216,0.3);font-family:'Share Tech Mono',monospace">AI SITES</div>
+      <div id="forge-credits-state" style="font-size:7px;color:rgba(192,200,216,0.3);font-family:'Share Tech Mono',monospace;margin-top:2px">OFF</div>
     </div>
-    <span id="forge-credits-state" style="font-size:6px;color:rgba(192,200,216,0.3);font-family:'Share Tech Mono',monospace">OFF</span>
+    <div id="forge-credits-track" style="width:32px;height:18px;background:rgba(255,255,255,0.06);border-radius:9px;position:relative;border:1px solid rgba(255,80,80,0.2);transition:all 0.3s;flex-shrink:0">
+      <div id="forge-credits-thumb" style="position:absolute;left:3px;top:3px;width:12px;height:12px;border-radius:6px;background:rgba(255,100,100,0.3);transition:all 0.3s"></div>
+    </div>
   </div>
 
 </div>
@@ -1658,9 +1664,11 @@ function toggleSentinelCredits(){
   const thumb = document.getElementById('sentinel-credits-thumb');
   const track = document.getElementById('sentinel-credits-track');
   const state = document.getElementById('sentinel-credits-state');
-  if(thumb){ thumb.style.left=on?'13px':'3px'; thumb.style.background=on?'#00B4D8':'rgba(0,180,216,0.3)'; thumb.style.boxShadow=on?'0 0 6px #00B4D8':'none'; }
+  const box = document.getElementById('sentinel-credits-box');
+  if(thumb){ thumb.style.left=on?'17px':'3px'; thumb.style.background=on?'#00B4D8':'rgba(0,180,216,0.3)'; thumb.style.boxShadow=on?'0 0 6px #00B4D8':'none'; }
   if(track) track.style.borderColor=on?'rgba(0,180,216,0.6)':'rgba(0,180,216,0.2)';
   if(state){ state.textContent=on?'ON':'OFF'; state.style.color=on?'#00B4D8':'rgba(192,200,216,0.3)'; }
+  if(box) box.style.borderColor=on?'rgba(0,180,216,0.5)':'rgba(0,180,216,0.2)';
   addLog('SENTINEL',on?'⚡ AI email search ON — Claude will hunt emails':'AI email search OFF — free mode only',on?'s':'w');
 }
 
@@ -1671,9 +1679,11 @@ function toggleForgeCredits(){
   const thumb = document.getElementById('forge-credits-thumb');
   const track = document.getElementById('forge-credits-track');
   const state = document.getElementById('forge-credits-state');
-  if(thumb){ thumb.style.left=on?'13px':'3px'; thumb.style.background=on?'#FF6464':'rgba(255,100,100,0.3)'; thumb.style.boxShadow=on?'0 0 6px #FF6464':'none'; }
+  const box = document.getElementById('forge-credits-box');
+  if(thumb){ thumb.style.left=on?'17px':'3px'; thumb.style.background=on?'#FF6464':'rgba(255,100,100,0.3)'; thumb.style.boxShadow=on?'0 0 6px #FF6464':'none'; }
   if(track) track.style.borderColor=on?'rgba(255,51,51,0.6)':'rgba(255,51,51,0.2)';
   if(state){ state.textContent=on?'ON':'OFF'; state.style.color=on?'#FF6464':'rgba(192,200,216,0.3)'; }
+  if(box) box.style.borderColor=on?'rgba(255,80,80,0.5)':'rgba(255,80,80,0.2)';
   addLog('FORGE',on?'⚡ AI site generation ON — bespoke sites per business':'AI site generation OFF — using niche templates',on?'s':'w');
 }
 
