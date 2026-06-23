@@ -396,14 +396,27 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
   <span id="switch-state">OFF</span>
 </div>
 
-<!-- CLAUDE CREDITS TOGGLE -->
-<div id="credits-toggle-wrap" style="position:fixed;right:8px;top:calc(50% + 100px);z-index:100;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 8px;background:rgba(6,10,24,0.95);border:1px solid rgba(155,89,182,0.3);border-radius:10px;backdrop-filter:blur(12px)">
-  <span style="font-size:6px;letter-spacing:1.5px;color:rgba(155,89,182,0.7);writing-mode:vertical-rl;transform:rotate(180deg);margin-bottom:4px">CLAUDE</span>
-  <div id="credits-toggle" onclick="toggleCredits()" style="width:28px;height:52px;background:rgba(255,255,255,0.06);border-radius:14px;cursor:pointer;position:relative;border:1px solid rgba(155,89,182,0.3);transition:all 0.3s">
-    <div id="credits-thumb" style="position:absolute;left:3px;bottom:3px;width:22px;height:22px;border-radius:11px;background:rgba(155,89,182,0.4);transition:all 0.3s"></div>
+<!-- SENTINEL + FORGE CREDIT TOGGLES — top right dashboard -->
+<div id="credits-panel" style="position:fixed;top:16px;right:80px;z-index:100;display:flex;gap:10px;align-items:flex-start">
+
+  <!-- SENTINEL TOGGLE -->
+  <div style="background:rgba(6,10,24,0.92);border:1px solid rgba(0,180,216,0.2);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:52px">
+    <span style="font-size:7px;letter-spacing:1.5px;color:rgba(0,180,216,0.6);font-family:'Share Tech Mono',monospace">SENT</span>
+    <div onclick="toggleSentinelCredits()" style="width:28px;height:16px;background:rgba(255,255,255,0.06);border-radius:8px;cursor:pointer;position:relative;border:1px solid rgba(0,180,216,0.2);transition:all 0.3s" id="sentinel-credits-track">
+      <div id="sentinel-credits-thumb" style="position:absolute;left:3px;top:2px;width:12px;height:12px;border-radius:6px;background:rgba(0,180,216,0.3);transition:all 0.3s"></div>
+    </div>
+    <span id="sentinel-credits-state" style="font-size:6px;color:rgba(192,200,216,0.3);font-family:'Share Tech Mono',monospace">OFF</span>
   </div>
-  <div id="credits-glow" style="width:8px;height:8px;border-radius:50%;background:rgba(155,89,182,0.3);transition:all 0.3s"></div>
-  <span id="credits-state" style="font-size:6px;letter-spacing:1px;color:rgba(155,89,182,0.5);font-family:'Share Tech Mono',monospace">OFF</span>
+
+  <!-- FORGE TOGGLE -->
+  <div style="background:rgba(6,10,24,0.92);border:1px solid rgba(255,51,51,0.2);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:52px">
+    <span style="font-size:7px;letter-spacing:1.5px;color:rgba(255,100,100,0.6);font-family:'Share Tech Mono',monospace">FORG</span>
+    <div onclick="toggleForgeCredits()" style="width:28px;height:16px;background:rgba(255,255,255,0.06);border-radius:8px;cursor:pointer;position:relative;border:1px solid rgba(255,51,51,0.2);transition:all 0.3s" id="forge-credits-track">
+      <div id="forge-credits-thumb" style="position:absolute;left:3px;top:2px;width:12px;height:12px;border-radius:6px;background:rgba(255,100,100,0.3);transition:all 0.3s"></div>
+    </div>
+    <span id="forge-credits-state" style="font-size:6px;color:rgba(192,200,216,0.3);font-family:'Share Tech Mono',monospace">OFF</span>
+  </div>
+
 </div>
 
 <!-- BOTTOM BAR -->
@@ -1170,7 +1183,7 @@ async function triggerParallelPipeline(lead){
       setNodeStatus('FORGE','RUNNING');
       STATE.forgeRunning=true;
       let html='';
-      if(STATE.claudeCreditsOn){
+      if(STATE.forgeCreditsOn){
         try{
           html=await buildSiteWithAI(l);
           pipelineLog(`🔴 FORGE: AI site generated for ${l.name}`,'s');
@@ -1449,7 +1462,7 @@ async function runScoutForPipeline(location, niche){
       for(const lead of track1){
         if(pipelineStopped||creditsGone)break;
         try{
-          if(!STATE.claudeCreditsOn){
+          if(!STATE.sentinelCreditsOn){
             pipelineLog(`🔵 SENTINEL: Credits OFF — skipping AI search for ${lead.name||lead.Name}`,'i');
             lead.blacklisted=true;
             try{ await sbInsert('scanner_log',{business_name:lead.name,location:lead.location||'',niche:lead.niche||'',status:'blacklisted',created_at:new Date().toISOString()}); }catch{}
@@ -1513,7 +1526,7 @@ async function runForgeForPipeline(){
       item.status='building';
       try{
         let html;
-        if(STATE.claudeCreditsOn){try{html=await buildSiteWithAI(item)}catch{html=buildSiteHTML(item)}}else{html=buildSiteHTML(item);}
+        if(STATE.forgeCreditsOn){try{html=await buildSiteWithAI(item)}catch{html=buildSiteHTML(item)}}else{html=buildSiteHTML(item);}
         const saved=await sbInsert('forge_output',{lead_id:item.id,business_name:item.name,html,status:'ready'});
         item.forge_id=saved?.id;item.html=html;item.status='saved';
         STATE.stats.built++;updateBottomBar();
@@ -1633,22 +1646,38 @@ function toggleMachineSwitch(){
 }
 
 // If pipeline is cancelled — reset switch
-// ── CLAUDE CREDITS TOGGLE ──────────────────
+// ── CLAUDE CREDITS TOGGLES ──────────────────
 STATE.claudeCreditsOn = false;
+STATE.sentinelCreditsOn = false;
+STATE.forgeCreditsOn = false;
 
-function toggleCredits(){
-  STATE.claudeCreditsOn = !STATE.claudeCreditsOn;
-  const on = STATE.claudeCreditsOn;
-  const thumb = document.getElementById('credits-thumb');
-  const glow = document.getElementById('credits-glow');
-  const state = document.getElementById('credits-state');
-  const wrap = document.getElementById('credits-toggle-wrap');
-  if(thumb) thumb.style.cssText = `position:absolute;left:3px;${on?'top':'bottom'}:3px;width:22px;height:22px;border-radius:11px;background:${on?'#9B59B6':'rgba(155,89,182,0.4)'};transition:all 0.3s;box-shadow:${on?'0 0 8px #9B59B6':'none'}`;
-  if(glow) glow.style.background = on?'#9B59B6':'rgba(155,89,182,0.3)';
-  if(state){ state.textContent = on?'ON':'OFF'; state.style.color = on?'#9B59B6':'rgba(155,89,182,0.5)'; }
-  if(wrap) wrap.style.borderColor = on?'rgba(155,89,182,0.6)':'rgba(155,89,182,0.3)';
-  addLog('GALAXY', on?'⚡ Claude Credits ON — FORGE builds bespoke sites, SENTINEL uses AI search':'Claude Credits OFF — FORGE uses templates, SENTINEL uses free scan', on?'s':'w');
+function toggleSentinelCredits(){
+  STATE.sentinelCreditsOn = !STATE.sentinelCreditsOn;
+  STATE.claudeCreditsOn = STATE.sentinelCreditsOn || STATE.forgeCreditsOn;
+  const on = STATE.sentinelCreditsOn;
+  const thumb = document.getElementById('sentinel-credits-thumb');
+  const track = document.getElementById('sentinel-credits-track');
+  const state = document.getElementById('sentinel-credits-state');
+  if(thumb){ thumb.style.left=on?'13px':'3px'; thumb.style.background=on?'#00B4D8':'rgba(0,180,216,0.3)'; thumb.style.boxShadow=on?'0 0 6px #00B4D8':'none'; }
+  if(track) track.style.borderColor=on?'rgba(0,180,216,0.6)':'rgba(0,180,216,0.2)';
+  if(state){ state.textContent=on?'ON':'OFF'; state.style.color=on?'#00B4D8':'rgba(192,200,216,0.3)'; }
+  addLog('SENTINEL',on?'⚡ AI email search ON — Claude will hunt emails':'AI email search OFF — free mode only',on?'s':'w');
 }
+
+function toggleForgeCredits(){
+  STATE.forgeCreditsOn = !STATE.forgeCreditsOn;
+  STATE.claudeCreditsOn = STATE.sentinelCreditsOn || STATE.forgeCreditsOn;
+  const on = STATE.forgeCreditsOn;
+  const thumb = document.getElementById('forge-credits-thumb');
+  const track = document.getElementById('forge-credits-track');
+  const state = document.getElementById('forge-credits-state');
+  if(thumb){ thumb.style.left=on?'13px':'3px'; thumb.style.background=on?'#FF6464':'rgba(255,100,100,0.3)'; thumb.style.boxShadow=on?'0 0 6px #FF6464':'none'; }
+  if(track) track.style.borderColor=on?'rgba(255,51,51,0.6)':'rgba(255,51,51,0.2)';
+  if(state){ state.textContent=on?'ON':'OFF'; state.style.color=on?'#FF6464':'rgba(192,200,216,0.3)'; }
+  addLog('FORGE',on?'⚡ AI site generation ON — bespoke sites per business':'AI site generation OFF — using niche templates',on?'s':'w');
+}
+
+function toggleCredits(){ toggleSentinelCredits(); toggleForgeCredits(); }
 
 function resetSwitch(){
   machineOn = false;
@@ -3190,7 +3219,7 @@ async function startForge(){
         addLog('FORGE',`🤖 AI generating site for ${item.name}...`,'i');
         let html;
         try{
-          if(!STATE.claudeCreditsOn) throw new Error('Credits OFF');
+          if(!STATE.forgeCreditsOn) throw new Error('Credits OFF');
           html=await buildSiteWithAI(item);
           addLog('FORGE',`✅ AI built: ${item.name}`,'s');
         }catch(aiErr){
@@ -3745,7 +3774,7 @@ async function startSentinel(){
       addLog('SENTINEL',`🔍 Asking Claude to find: ${name}${location?' in '+location:''}`,'i');
 
       try{
-        if(!STATE.claudeCreditsOn){
+        if(!STATE.sentinelCreditsOn){
           addLog('SENTINEL',`Credits OFF — skipping AI search for ${name}`,'i');
           continue;
         }
