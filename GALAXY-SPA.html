@@ -1067,9 +1067,12 @@ async function runSingleSession(location, niche, sessionNum, totalSessions){
   // Reset per-session STATE
   STATE.leads=[];STATE.binned=[];STATE.forgeQueue=[];STATE.launchQueue=[];
   STATE.scannerQueue=[];STATE.dispatchQueue=[];STATE.scannerIntel=[];
+  STATE.sentLog=[];STATE.stats={leads:0,built:0,live:0,sent:0};
+  launchedBusinessNames=null; // clear processed business cache
   pipelineStopped=false;
   STATE.scoutStopped=false;STATE.forgeStopped=false;STATE.launchStopped=false;
   STATE.scannerStopped=false;STATE.dispatchStopped=false;
+  updateBottomBar();
 
   showPipelineToast(`🧠 SESSION ${sessionNum}/${totalSessions} — ${location} / ${niche}`);
   pipelineLog(`🧠 SESSION ${sessionNum}/${totalSessions} — ${location} / ${niche}`,'s');
