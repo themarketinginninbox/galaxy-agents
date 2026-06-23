@@ -369,11 +369,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 
   <div style="border-top:1px solid rgba(255,255,255,0.06);margin:20px 0"></div>
 
-  <!-- RESET -->
+  <!-- CLEAN SLATE / RESET -->
   <div style="margin-bottom:20px">
-    <div style="font-size:8px;letter-spacing:3px;color:rgba(255,51,85,0.6);margin-bottom:10px">⚠️ RESET — CLEAR ALL DATA</div>
-    <div style="font-size:8px;color:rgba(192,200,216,0.3);margin-bottom:12px;line-height:1.6">Clears all Supabase tables, cached site IDs and in-memory queues. Use before a fresh test run.</div>
-    <button ontouchstart="resetGalaxy()" onclick="resetGalaxy()" style="width:100%;padding:12px;background:rgba(255,51,85,0.08);border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;cursor:pointer;touch-action:manipulation">🗑 RESET ALL DATA</button>
+    <div style="font-size:8px;letter-spacing:3px;color:rgba(255,51,85,0.6);margin-bottom:10px">⚠️ CLEAN SLATE</div>
+    <div style="font-size:8px;color:rgba(192,200,216,0.3);margin-bottom:12px;line-height:1.6">Wipes all Supabase tables, deletes all galaxy-* GitHub repos, clears localStorage caches and resets all in-memory state. Use before going live.</div>
+    <div id="reset-confirm-wrap" style="display:none;margin-bottom:10px">
+      <input id="reset-confirm-input" placeholder='Type RESET to confirm' style="background:rgba(255,51,85,0.06);border:1px solid rgba(255,51,85,0.3);border-radius:4px;padding:9px 12px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:10px;outline:none;width:100%;margin-bottom:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button onclick="document.getElementById('reset-confirm-wrap').style.display='none'" style="padding:10px;background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:4px;color:rgba(192,200,216,0.5);font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer">CANCEL</button>
+        <button onclick="confirmCleanSlate()" style="padding:10px;background:rgba(255,51,85,0.1);border:1px solid rgba(255,51,85,0.4);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:9px;cursor:pointer;letter-spacing:1px">CONFIRM WIPE</button>
+      </div>
+    </div>
+    <button ontouchstart="showResetConfirm()" onclick="showResetConfirm()" style="width:100%;padding:12px;background:rgba(255,51,85,0.08);border:1px solid rgba(255,51,85,0.3);border-radius:4px;color:#FF3355;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;cursor:pointer;touch-action:manipulation">🗑 CLEAN SLATE — WIPE ALL DATA</button>
     <div id="reset-log" style="font-size:8px;color:#00B4D8;margin-top:8px;min-height:16px"></div>
   </div>
 
@@ -707,45 +714,12 @@ function initGalaxyHold(){
 const activationModal=document.createElement('div');
 activationModal.style.cssText='position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:rgba(1,2,8,0.9);backdrop-filter:blur(8px)';
 activationModal.innerHTML=`
-<div style="background:rgba(6,10,24,0.98);border:1px solid rgba(0,180,216,0.3);border-radius:16px;padding:28px 24px;width:calc(100% - 48px);max-width:420px">
+<div style="background:rgba(6,10,24,0.98);border:1px solid rgba(0,180,216,0.3);border-radius:16px;padding:28px 24px;width:calc(100% - 48px);max-width:420px;max-height:90vh;overflow-y:auto">
   <div style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;color:#00B4D8;letter-spacing:4px;margin-bottom:4px">🧠 GALAXY</div>
-  <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:24px">FULL PIPELINE ACTIVATION</div>
-  
-  <div style="margin-bottom:16px">
-    <div style="font-size:8px;letter-spacing:2px;color:#4AB3FF;margin-bottom:6px">TARGET LOCATION</div>
-    <div style="position:relative">
-      <input id="galaxy-location" style="background:rgba(1,2,8,0.8);border:1px solid rgba(0,180,216,0.2);border-radius:4px;padding:11px 14px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;width:100%" placeholder="Start typing town..." oninput="handleGalaxyAC(this.value)" onkeydown="handleGalaxyACKey(event)">
-      <div id="galaxy-ac-list" style="position:absolute;top:100%;left:0;right:0;z-index:700;background:#0a0f1e;border:1px solid #00B4D8;border-top:none;border-radius:0 0 4px 4px;max-height:160px;overflow-y:auto;display:none"></div>
-    </div>
-  </div>
+  <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:20px">SESSION QUEUE — FULL PIPELINE</div>
 
-  <div style="margin-bottom:24px">
-    <div style="font-size:8px;letter-spacing:2px;color:#4AB3FF;margin-bottom:6px">TARGET NICHE</div>
-    <select id="galaxy-niche" style="background:rgba(1,2,8,0.8);border:1px solid rgba(0,180,216,0.2);border-radius:4px;padding:11px 14px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;width:100%">
-      <option value="">— Select niche —</option>
-      <optgroup label="Food & Drink">
-        <option value="restaurant">Restaurants</option>
-        <option value="cafe">Cafes</option>
-        <option value="bar">Bars & Pubs</option>
-        <option value="fast_food">Fast Food</option>
-        <option value="bakery">Bakeries</option>
-      </optgroup>
-      <optgroup label="Health & Beauty">
-        <option value="pharmacy">Pharmacies</option>
-        <option value="hairdresser">Barbers & Hair</option>
-        <option value="beauty">Beauty Salons</option>
-        <option value="dentist">Dentists</option>
-        <option value="gym">Gyms</option>
-      </optgroup>
-      <optgroup label="Trades">
-        <option value="car_repair">Car Repair</option>
-        <option value="clothes">Clothing</option>
-        <option value="convenience">Convenience</option>
-      </optgroup>
-    </select>
-  </div>
-
-  <div style="background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);border-radius:6px;padding:12px;margin-bottom:20px">
+  <!-- DEMO MODE -->
+  <div style="background:rgba(255,170,0,0.06);border:1px solid rgba(255,170,0,0.2);border-radius:6px;padding:10px;margin-bottom:16px">
     <div style="font-size:8px;letter-spacing:2px;color:#FFAA00;margin-bottom:8px">🎯 DEMO MODE</div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
       <button id="galaxy-demo-toggle" style="width:34px;height:18px;background:rgba(255,255,255,0.1);border-radius:9px;cursor:pointer;position:relative;transition:background 0.3s;border:none" onclick="toggleGalaxyDemo()"></button>
@@ -754,13 +728,50 @@ activationModal.innerHTML=`
     <input id="galaxy-demo-email" type="email" placeholder="your@email.com" style="background:rgba(1,2,8,0.8);border:1px solid rgba(255,170,0,0.2);border-radius:4px;padding:9px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;display:none">
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <button onclick="closeActivationModal()" style="padding:13px;background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:4px;color:rgba(192,200,216,0.5);font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;cursor:pointer">CANCEL</button>
-    <button onclick="confirmActivation()" style="padding:13px;background:transparent;border:1px solid #00B4D8;border-radius:4px;color:#00B4D8;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;cursor:pointer;box-shadow:0 0 12px rgba(0,180,216,0.2)">🧠 ACTIVATE</button>
+  <!-- SESSION QUEUE -->
+  <div style="font-size:8px;letter-spacing:2px;color:#4AB3FF;margin-bottom:8px">SESSION QUEUE</div>
+  <div id="session-queue-list" style="margin-bottom:12px;max-height:200px;overflow-y:auto"></div>
+
+  <!-- ADD SESSION ROW -->
+  <div style="background:rgba(0,180,216,0.04);border:1px solid rgba(0,180,216,0.15);border-radius:6px;padding:12px;margin-bottom:12px">
+    <div style="font-size:8px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:10px">ADD SESSION</div>
+    <div style="position:relative;margin-bottom:8px">
+      <input id="galaxy-location" style="background:rgba(1,2,8,0.8);border:1px solid rgba(0,180,216,0.2);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%" placeholder="Town / City..." oninput="handleGalaxyAC(this.value)" onkeydown="handleGalaxyACKey(event)">
+      <div id="galaxy-ac-list" style="position:absolute;top:100%;left:0;right:0;z-index:700;background:#0a0f1e;border:1px solid #00B4D8;border-top:none;border-radius:0 0 4px 4px;max-height:140px;overflow-y:auto;display:none"></div>
+    </div>
+    <select id="galaxy-niche" style="background:rgba(1,2,8,0.8);border:1px solid rgba(0,180,216,0.2);border-radius:4px;padding:10px 12px;color:#C0C8D8;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;margin-bottom:8px">
+      <option value="">— Select niche —</option>
+      <optgroup label="Food & Drink">
+        <option value="restaurant">Restaurants</option>
+        <option value="cafe">Cafes</option>
+        <option value="bar">Bars & Pubs</option>
+        <option value="fast_food">Fast Food / Takeaway</option>
+        <option value="bakery">Bakeries</option>
+      </optgroup>
+      <optgroup label="Health & Beauty">
+        <option value="pharmacy">Pharmacies</option>
+        <option value="hairdresser">Barbers & Hair</option>
+        <option value="beauty">Beauty Salons</option>
+        <option value="dentist">Dentists</option>
+        <option value="gym">Gyms & Fitness</option>
+      </optgroup>
+      <optgroup label="Trades & Retail">
+        <option value="car_repair">Car Repair</option>
+        <option value="clothes">Clothing</option>
+        <option value="convenience">Convenience Stores</option>
+      </optgroup>
+    </select>
+    <button onclick="addSessionToQueue()" style="width:100%;padding:10px;background:rgba(0,180,216,0.1);border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;cursor:pointer">+ ADD TO QUEUE</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    <button onclick="closeActivationModal()" style="padding:12px;background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:4px;color:rgba(192,200,216,0.5);font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;cursor:pointer">CANCEL</button>
+    <button onclick="confirmActivation()" style="padding:12px;background:transparent;border:1px solid #00B4D8;border-radius:4px;color:#00B4D8;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;cursor:pointer;box-shadow:0 0 12px rgba(0,180,216,0.2)">🧠 LAUNCH QUEUE</button>
   </div>
 
   <!-- PIPELINE STATUS — shown after activation -->
-  <div id="pipeline-status" style="display:none;margin-top:20px;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px">
+  <div id="pipeline-status" style="display:none;margin-top:16px;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px">
+    <div id="session-progress" style="font-size:8px;letter-spacing:2px;color:#00B4D8;margin-bottom:8px"></div>
     <div id="pipeline-log" style="background:rgba(1,2,8,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:4px;padding:10px;height:120px;overflow-y:auto;font-size:9px;font-family:'Share Tech Mono',monospace;margin-bottom:12px"></div>
     <button onclick="stopPipeline()" style="width:100%;padding:11px;background:transparent;border:1px solid #FF3355;border-radius:4px;color:#FF3355;font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;cursor:pointer">⬛ STOP PIPELINE</button>
   </div>
@@ -803,7 +814,50 @@ function selectGalaxyTown(town){
   document.getElementById('galaxy-ac-list').style.display='none';
 }
 
+// ── SESSION QUEUE ──────────────────────────────
+let SESSION_QUEUE = [];
+
+function renderSessionQueue(){
+  const list = document.getElementById('session-queue-list');
+  if(!list) return;
+  if(!SESSION_QUEUE.length){
+    list.innerHTML = '<div style="font-size:8px;color:rgba(192,200,216,0.3);text-align:center;padding:12px 0">No sessions queued — add one below</div>';
+    return;
+  }
+  list.innerHTML = SESSION_QUEUE.map((s,i)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(0,180,216,0.06);border:1px solid rgba(0,180,216,0.15);border-radius:4px;margin-bottom:6px">
+      <div>
+        <div style="font-size:9px;color:#fff;font-family:'Share Tech Mono',monospace">${i+1}. ${s.location}</div>
+        <div style="font-size:7px;color:rgba(192,200,216,0.5);margin-top:2px">${s.niche.replace(/_/g,' ').toUpperCase()}</div>
+      </div>
+      <button onclick="removeSession(${i})" style="background:transparent;border:1px solid rgba(255,51,85,0.3);border-radius:3px;color:#FF3355;font-size:8px;padding:3px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace">✕</button>
+    </div>`).join('');
+}
+
+function addSessionToQueue(){
+  const location = document.getElementById('galaxy-location')?.value?.trim();
+  const niche = document.getElementById('galaxy-niche')?.value;
+  if(!location || !niche){ 
+    if(!location) document.getElementById('galaxy-location').style.borderColor='#FF3355';
+    if(!niche) document.getElementById('galaxy-niche').style.borderColor='#FF3355';
+    return;
+  }
+  SESSION_QUEUE.push({ location, niche });
+  document.getElementById('galaxy-location').value = '';
+  document.getElementById('galaxy-niche').value = '';
+  document.getElementById('galaxy-location').style.borderColor = '';
+  document.getElementById('galaxy-niche').style.borderColor = '';
+  renderSessionQueue();
+}
+
+function removeSession(idx){
+  SESSION_QUEUE.splice(idx, 1);
+  renderSessionQueue();
+}
+
 function activatePipeline(){
+  SESSION_QUEUE = [];
+  renderSessionQueue();
   activationModal.style.display='flex';
 }
 function closeActivationModal(){
@@ -847,73 +901,117 @@ function stopPipeline(){
   },2000);
 }
 
-async function confirmActivation(){
-  const location=document.getElementById('galaxy-location')?.value?.trim();
-  const niche=document.getElementById('galaxy-niche').value;
-  const demoEmail=document.getElementById('galaxy-demo-email').value.trim();
+async function runSingleSession(location, niche, sessionNum, totalSessions){
+  const prog = document.getElementById('session-progress');
+  if(prog) prog.textContent = `SESSION ${sessionNum}/${totalSessions} — ${location.toUpperCase()} / ${niche.toUpperCase()}`;
 
-  if(!location){document.getElementById('galaxy-location').style.borderColor='#FF3355';return}
-  if(!niche){document.getElementById('galaxy-niche').style.borderColor='#FF3355';return}
-  if(galaxyDemoOn&&!demoEmail){document.getElementById('galaxy-demo-email').style.borderColor='#FF3355';return}
-
-  // Set global state
-  STATE.scoutLocation=location;
-  STATE.scoutNiche=niche;
-  STATE.demoMode=galaxyDemoOn;
-  STATE.demoEmail=demoEmail;
-
-  pipelineRunning=true;
+  // Reset per-session STATE
+  STATE.leads=[];STATE.binned=[];STATE.forgeQueue=[];STATE.launchQueue=[];
+  STATE.scannerQueue=[];STATE.dispatchQueue=[];STATE.scannerIntel=[];
   pipelineStopped=false;
+  STATE.scoutStopped=false;STATE.forgeStopped=false;STATE.launchStopped=false;
+  STATE.scannerStopped=false;STATE.dispatchStopped=false;
 
-  // Close modal — let user watch dashboard while pipeline runs
-  activationModal.style.display='none';
-
-  // Show a small status toast
-  showPipelineToast(`🧠 GALAXY ACTIVE — ${location} / ${niche}`);
-
-  pipelineLog(`🧠 GALAXY ACTIVATED — ${location} / ${niche}`,'s');
-  pipelineLog(galaxyDemoOn?`Demo mode ON → ${demoEmail}`:'Live mode — sending to real businesses','w');
+  showPipelineToast(`🧠 SESSION ${sessionNum}/${totalSessions} — ${location} / ${niche}`);
+  pipelineLog(`🧠 SESSION ${sessionNum}/${totalSessions} — ${location} / ${niche}`,'s');
 
   // ── STAGE 1: SCOUT ──
   pipelineLog('🔵 SCOUT initiating...','i');
   setNodeStatus('SCOUT','RUNNING');
   await runScoutForPipeline(location, niche);
-  if(pipelineStopped)return;
+  if(pipelineStopped)return false;
   pipelineLog(`🔵 SCOUT complete — ${STATE.leads.length} leads found`,'s');
 
   // ── STAGE 2: SCANNER (Phase 1 — Intelligence) ──
   pipelineLog('🟤 SCANNER initiating — intelligence phase...','i');
   await runScannerPhase1();
-  if(pipelineStopped)return;
+  if(pipelineStopped)return false;
   pipelineLog(`🟤 SCANNER Phase 1 complete — niches verified`,'s');
 
   // ── STAGE 3: FORGE ──
   pipelineLog('🔴 FORGE initiating...','i');
   await runForgeForPipeline();
-  if(pipelineStopped)return;
+  if(pipelineStopped)return false;
   pipelineLog(`🔴 FORGE complete — ${STATE.forgeQueue.filter(i=>i.status==='saved').length} sites built`,'s');
 
   // ── STAGE 4: LAUNCH ──
   pipelineLog('🟢 LAUNCH initiating...','i');
   await runLaunchForPipeline();
-  if(pipelineStopped)return;
+  if(pipelineStopped)return false;
   pipelineLog(`🟢 LAUNCH complete — ${STATE.launchQueue.filter(i=>i.status==='live').length} sites live`,'s');
 
   // ── STAGE 5: SCANNER (Phase 2 — Proof) ──
   pipelineLog('🟤 SCANNER initiating — proof phase...','i');
   await startScanner();
-  if(pipelineStopped)return;
+  if(pipelineStopped)return false;
   pipelineLog(`🟤 SCANNER Phase 2 complete — ${STATE.scannerQueue.filter(i=>i.status==='approved').length} approved`,'s');
 
   // ── STAGE 6: DISPATCH ──
   pipelineLog('🟠 DISPATCH initiating...','i');
   await startDispatch();
-  pipelineLog(`🟠 DISPATCH complete — ${STATE.sentLog.length} emails sent`,'s');
+  pipelineLog(`🟠 SESSION ${sessionNum} COMPLETE — ${STATE.sentLog.length} sent`,'s');
+
+  // Save to Supabase session log for SAM tracking
+  try{
+    await sbInsert('scanner_log',{
+      business_name:`SESSION: ${location}/${niche}`,
+      status:'session_complete',
+      created_at:new Date().toISOString()
+    });
+  }catch{}
+
+  addLog('SAM',`Session ${sessionNum}/${totalSessions} complete — ${location}/${niche} — ${STATE.sentLog.length} dispatched`,'s');
+  return true;
+}
+
+async function confirmActivation(){
+  const demoEmail=document.getElementById('galaxy-demo-email').value.trim();
+  if(galaxyDemoOn&&!demoEmail){document.getElementById('galaxy-demo-email').style.borderColor='#FF3355';return}
+
+  // Build final queue — include current input if filled
+  const loc=document.getElementById('galaxy-location')?.value?.trim();
+  const niche=document.getElementById('galaxy-niche')?.value;
+  if(loc && niche) SESSION_QUEUE.push({location:loc, niche});
+
+  if(!SESSION_QUEUE.length){
+    document.getElementById('galaxy-location').style.borderColor='#FF3355';
+    return;
+  }
+
+  // Set global state
+  STATE.demoMode=galaxyDemoOn;
+  STATE.demoEmail=demoEmail;
+  pipelineRunning=true;
+  pipelineStopped=false;
+
+  // Show pipeline status
+  document.getElementById('pipeline-status').style.display='block';
+  document.getElementById('session-progress').style.display='block';
+
+  const sessions=[...SESSION_QUEUE];
+  const total=sessions.length;
+
+  pipelineLog(`🧠 GALAXY QUEUE — ${total} session${total>1?'s':''} queued`,'s');
+  pipelineLog(galaxyDemoOn?`Demo mode ON → ${demoEmail}`:'Live mode — sending to real businesses','w');
+
+  for(let i=0;i<sessions.length;i++){
+    if(pipelineStopped)break;
+    const s=sessions[i];
+    STATE.scoutLocation=s.location;
+    STATE.scoutNiche=s.niche;
+    const ok=await runSingleSession(s.location, s.niche, i+1, total);
+    if(!ok)break;
+    if(i<sessions.length-1&&!pipelineStopped){
+      pipelineLog(`⏳ Next session starting in 10s...`,'i');
+      await new Promise(r=>setTimeout(r,10000));
+    }
+  }
 
   pipelineRunning=false;
-  pipelineLog('✅ GALAXY PIPELINE COMPLETE','s');
-  addLog('SAM',`Pipeline complete — ${location}/${niche} — ${STATE.sentLog.length} sent`,'s');
-  
+  SESSION_QUEUE=[];
+  pipelineLog(`✅ ALL SESSIONS COMPLETE`,'s');
+  addLog('SAM',`All ${total} sessions complete`,'s');
+
   // Reset switch and hide overlays after 3s
   setTimeout(()=>{
     resetSwitch();
@@ -1575,12 +1673,30 @@ function closePreview(){
   document.getElementById('preview-frame').srcdoc='';
 }
 
+function showResetConfirm(){
+  document.getElementById('reset-confirm-wrap').style.display='block';
+  document.getElementById('reset-confirm-input').value='';
+  document.getElementById('reset-confirm-input').focus();
+}
+
+async function confirmCleanSlate(){
+  const val=document.getElementById('reset-confirm-input')?.value?.trim();
+  if(val!=='RESET'){
+    document.getElementById('reset-confirm-input').style.borderColor='#FF3355';
+    return;
+  }
+  document.getElementById('reset-confirm-wrap').style.display='none';
+  await resetGalaxy();
+}
+
 async function resetGalaxy(){
   const log=document.getElementById('reset-log');
   log.style.color='#FFAA00';
-  log.textContent='Resetting...';
+  log.textContent='Wiping all data...';
+  let steps=0;
+
   try{
-    // Clear Supabase tables
+    // 1. Clear Supabase tables
     const tables=['scout_leads','forge_output','launch_output','dispatch_queue','scanner_log'];
     for(const t of tables){
       try{
@@ -1588,27 +1704,59 @@ async function resetGalaxy(){
           method:'DELETE',
           headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'}
         });
+        steps++;
       }catch(e){}
     }
-    // Clear localStorage site caches
+    log.textContent=`Supabase cleared (${steps} tables)... deleting GitHub repos`;
+
+    // 2. Delete all galaxy-* GitHub repos
+    const ghToken=STATE.githubToken||localStorage.getItem('galaxy_github_token');
+    if(ghToken){
+      try{
+        // List all repos starting with galaxy-
+        const reposRes=await fetch(`https://api.github.com/user/repos?per_page=100&type=owner`,{
+          headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github.v3+json'}
+        });
+        const repos=await reposRes.json();
+        const galaxyRepos=(repos||[]).filter(r=>r.name&&r.name.startsWith('galaxy-'));
+        let deleted=0;
+        for(const repo of galaxyRepos){
+          try{
+            await fetch(`https://api.github.com/repos/${repo.full_name}`,{
+              method:'DELETE',
+              headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github.v3+json'}
+            });
+            deleted++;
+          }catch{}
+          await new Promise(r=>setTimeout(r,300)); // avoid rate limit
+        }
+        log.textContent=`GitHub: ${deleted} repos deleted... clearing cache`;
+        steps+=deleted;
+      }catch(e){log.textContent='GitHub cleanup failed — clearing cache...'}
+    } else {
+      log.textContent='No GitHub token — skipping repo cleanup... clearing cache';
+    }
+
+    // 3. Clear all localStorage galaxy keys
     const keysToRemove=[];
     for(let i=0;i<localStorage.length;i++){
       const k=localStorage.key(i);
-      if(k&&(k.startsWith('galaxy_gh_site_')||k.startsWith('galaxy_cf_site_')||k.startsWith('galaxy_netlify_site_')||k==='galaxy_campaign_id')){
+      if(k&&(k.startsWith('galaxy_gh_site_')||k.startsWith('galaxy_cf_site_')||k.startsWith('galaxy_netlify_site_')||k==='galaxy_campaign_id'||k==='galaxy_instantly_campaign_id')){
         keysToRemove.push(k);
       }
     }
     keysToRemove.forEach(k=>localStorage.removeItem(k));
 
-    // Clear in-memory STATE
+    // 4. Clear in-memory STATE completely
     STATE.leads=[];STATE.binned=[];STATE.forgeQueue=[];STATE.launchQueue=[];
     STATE.scannerQueue=[];STATE.dispatchQueue=[];STATE.sentLog=[];
+    STATE.scannerIntel=[];STATE.samReplies=[];STATE.instantlyCampaignId=null;
     STATE.stats={leads:0,built:0,live:0,sent:0};
     launchedBusinessNames=null;
     updateBottomBar();
 
     log.style.color='#00FF88';
-    log.textContent=`✅ Reset complete — ${tables.length} tables cleared, ${keysToRemove.length} caches removed`;
+    log.textContent=`✅ Clean slate — Supabase wiped, GitHub repos deleted, cache cleared. Ready to go live.`;
   }catch(e){
     log.style.color='#FF3355';
     log.textContent='❌ Reset error: '+e.message;
