@@ -798,10 +798,20 @@ activationModal.innerHTML=`
     <button onclick="addSessionToQueue()" style="width:100%;padding:10px;background:rgba(0,180,216,0.1);border:1px solid rgba(0,180,216,0.3);border-radius:4px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;cursor:pointer">+ ADD TO QUEUE</button>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
     <button onclick="closeActivationModal()" style="padding:12px;background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:4px;color:rgba(192,200,216,0.5);font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;cursor:pointer">CANCEL</button>
     <button onclick="confirmActivation()" style="padding:12px;background:transparent;border:1px solid #00B4D8;border-radius:4px;color:#00B4D8;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;cursor:pointer;box-shadow:0 0 12px rgba(0,180,216,0.2)">🧠 LAUNCH QUEUE</button>
   </div>
+
+  <!-- SINGLE LEAD DEMO -->
+  <div onclick="toggleSingleDemo()" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.15);border-radius:6px;cursor:pointer;margin-bottom:4px;transition:all 0.2s" id="single-demo-wrap">
+    <div id="single-demo-check" style="width:15px;height:15px;border:1px solid rgba(0,255,136,0.4);border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s"></div>
+    <div>
+      <div style="font-size:9px;letter-spacing:2px;color:rgba(0,255,136,0.7);font-family:'Share Tech Mono',monospace">SINGLE LEAD DEMO</div>
+      <div style="font-size:7px;color:rgba(192,200,216,0.3);margin-top:2px">Finds one lead, full pipeline, sends to you — then stops</div>
+    </div>
+  </div>
+  <div id="single-demo-note" style="display:none;font-size:7px;color:rgba(255,80,80,0.7);letter-spacing:1px;padding:0 4px;margin-bottom:12px;font-family:'Share Tech Mono',monospace">* Parameters not needed for test demo — just hit Launch</div>
 
   <!-- PIPELINE STATUS — shown after activation -->
   <div id="pipeline-status" style="display:none;margin-top:16px;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px">
@@ -822,6 +832,21 @@ function toggleGalaxyDemo(){
   btn.style.setProperty('--after-left',galaxyDemoOn?'19px':'3px');
   lbl.textContent=galaxyDemoOn?'ON — emails go to demo address':'OFF — sends to real businesses';
   inp.style.display=galaxyDemoOn?'block':'none';
+}
+
+let singleDemoMode=false;
+function toggleSingleDemo(){
+  singleDemoMode=!singleDemoMode;
+  const check=document.getElementById('single-demo-check');
+  const note=document.getElementById('single-demo-note');
+  const wrap=document.getElementById('single-demo-wrap');
+  if(check){
+    check.innerHTML=singleDemoMode?'<span style="color:#00FF88;font-size:11px;line-height:1">✓</span>':'';
+    check.style.background=singleDemoMode?'rgba(0,255,136,0.15)':'transparent';
+    check.style.borderColor=singleDemoMode?'rgba(0,255,136,0.6)':'rgba(0,255,136,0.4)';
+  }
+  if(note) note.style.display=singleDemoMode?'block':'none';
+  if(wrap) wrap.style.borderColor=singleDemoMode?'rgba(0,255,136,0.4)':'rgba(0,255,136,0.15)';
 }
 
 // Galaxy AC
@@ -1000,6 +1025,12 @@ async function runSingleSession(location, niche, sessionNum, totalSessions){
   await startDispatch();
   pipelineLog(`🟠 SESSION ${sessionNum} COMPLETE — ${STATE.sentLog.length} sent`,'s');
 
+  // Single demo mode — stop after first successful send
+  if(singleDemoMode && STATE.sentLog.length > 0){
+    pipelineLog('✅ SINGLE DEMO COMPLETE — pipeline stopped after first lead','s');
+    pipelineStopped=true;
+  }
+
   // Save to Supabase session log for SAM tracking
   try{
     await sbInsert('scanner_log',{
@@ -1017,14 +1048,20 @@ async function confirmActivation(){
   const demoEmail=document.getElementById('galaxy-demo-email').value.trim();
   if(galaxyDemoOn&&!demoEmail){document.getElementById('galaxy-demo-email').style.borderColor='#FF3355';return}
 
-  // Build final queue — include current input if filled
-  const loc=document.getElementById('galaxy-location')?.value?.trim();
-  const niche=document.getElementById('galaxy-niche')?.value;
-  if(loc && niche) SESSION_QUEUE.push({location:loc, niche});
-
-  if(!SESSION_QUEUE.length){
-    document.getElementById('galaxy-location').style.borderColor='#FF3355';
-    return;
+  // Single demo mode — use whatever is in inputs or default to London/cafe
+  if(singleDemoMode){
+    // Single demo — use inputs if filled, otherwise broad UK search
+    const loc=document.getElementById('galaxy-location')?.value?.trim()||'Manchester';
+    const niche=document.getElementById('galaxy-niche')?.value||'restaurant';
+    SESSION_QUEUE=[{location:loc,niche}];
+  } else {
+    const loc=document.getElementById('galaxy-location')?.value?.trim();
+    const niche=document.getElementById('galaxy-niche')?.value;
+    if(loc && niche) SESSION_QUEUE.push({location:loc, niche});
+    if(!SESSION_QUEUE.length){
+      document.getElementById('galaxy-location').style.borderColor='#FF3355';
+      return;
+    }
   }
 
   // Set global state
@@ -1452,6 +1489,8 @@ async function runScoutForPipeline(location, niche){
         }
       }
       if(i%5===0)pipelineLog(`SCOUT: ${i+1}/${businesses.length} processed — ${STATE.leads.length} leads`,'i');
+      // Single demo — stop after first lead found
+      if(singleDemoMode && STATE.leads.length>=1) break;
       await new Promise(r=>setTimeout(r,200));
     }
     STATE.stats.leads=STATE.leads.length;updateBottomBar();
