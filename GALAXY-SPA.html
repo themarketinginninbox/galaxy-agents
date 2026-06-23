@@ -1327,11 +1327,13 @@ async function triggerParallelPipeline(lead){
   while(parallelQueue.length>0&&!pipelineStopped){
     const l=parallelQueue.shift();
     try{
-      // Skip if already processed
-      const launched=await getlaunchedNames();
-      if(launched.has(l.name?.toLowerCase().trim())){
-        pipelineLog(`⏭️ SKIP: ${l.name} already processed`,'i');
-        continue;
+      // Skip if already processed — but not in single demo mode
+      if(!singleDemoMode){
+        const launched=await getlaunchedNames();
+        if(launched.has(l.name?.toLowerCase().trim())){
+          pipelineLog(`⏭️ SKIP: ${l.name} already processed`,'i');
+          continue;
+        }
       }
 
       // FORGE — AI or template based on credits toggle
@@ -1673,9 +1675,10 @@ async function runForgeForPipeline(){
     const launchedNames=new Set((launched||[]).map(r=>r.business_name?.toLowerCase()));
 
     // Filter out already-processed leads
-    const newLeads=leads.filter(l=>!launchedNames.has(l.name?.toLowerCase()));
-    if(!newLeads.length){pipelineLog('FORGE: All leads already processed — skipping','w');return}
-    pipelineLog(`FORGE: ${newLeads.length} new leads to process (${leads.length-newLeads.length} skipped)`,'i');
+    const newLeads=singleDemoMode ? leads : leads.filter(l=>!launchedNames.has(l.name?.toLowerCase()));
+    if(!newLeads.length && !singleDemoMode){pipelineLog('FORGE: All leads already processed — skipping','w');return}
+    const forgeLeads = singleDemoMode ? leads : newLeads;
+    pipelineLog(`FORGE: ${forgeLeads.length} leads to process`,'i');
 
     STATE.forgeQueue=newLeads.map(l=>({...l,status:'queued'}));
     for(let i=0;i<STATE.forgeQueue.length;i++){
