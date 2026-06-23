@@ -1123,14 +1123,142 @@ async function triggerParallelPipeline(lead){
   setNodeStatus('SCANNER','IDLE');setNodeStatus('DISPATCH','IDLE');
 }
 
+// ═══════════════════════════════════════════
+// SCOUT — MULTI-SOURCE DATA FETCHER
+// Hits every available source in parallel,
+// merges and deduplicates by business name
+// ═══════════════════════════════════════════
+
+// Map UI niche to Overpass amenity/shop tags
+function nicheToOverpass(niche){
+  const map={
+    restaurant:['amenity=restaurant','amenity=bar','amenity=pub'],
+    cafe:['amenity=cafe','amenity=coffee_shop','shop=bakery'],
+    takeaway:['amenity=fast_food','amenity=food_court'],
+    beauty:['shop=hairdresser','shop=beauty','shop=cosmetics','shop=nail_salon'],
+    trades:['shop=plumber','craft=plumber','craft=electrician','craft=carpenter','craft=painter','shop=car_repair'],
+    retail:['shop=clothes','shop=gift','shop=boutique','shop=convenience','shop=general'],
+    fitness:['leisure=fitness_centre','leisure=sports_centre','sport=yoga'],
+    health:['amenity=dentist','amenity=pharmacy','amenity=clinic','healthcare=physiotherapist'],
+    automotive:['shop=car_repair','shop=tyres','amenity=fuel'],
+    cleaning:['shop=cleaning']
+  };
+  return map[niche]||['amenity=restaurant'];
+}
+
+async function fetchBizData(location, niche){
+  try{
+    const res=await fetch(`https://bizdata-web.vercel.app/api/businesses?location=${encodeURIComponent(location)}&category=${niche}&limit=500`,{signal:AbortSignal.timeout(12000)});
+    const data=await res.json();
+    const businesses=data.businesses||[];
+    return businesses.map(b=>({
+      name:b.name||'',phone:b.phone||'',website:b.website||'',
+      email:b.email||'',address:b.address||'',source:'BizData'
+    }));
+  }catch(e){
+    console.warn('BizData failed:',e.message);
+    return [];
+  }
+}
+
+async function fetchOverpass(location, niche){
+  try{
+    const tags=nicheToOverpass(niche);
+    // Geocode location to lat/lon using Nominatim (free, no key)
+    const geoRes=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location+', UK')}&format=json&limit=1`,{signal:AbortSignal.timeout(8000),headers:{'Accept-Language':'en'}});
+    const geoData=await geoRes.json();
+    if(!geoData.length) return [];
+    const {lat,lon}=geoData[0];
+    const radius=5000; // 5km radius
+
+    // Build Overpass query for all matching tags
+    const tagQueries=tags.map(t=>`node[${t}](around:${radius},${lat},${lon});way[${t}](around:${radius},${lat},${lon});`).join('');
+    const query=`[out:json][timeout:25];(${tagQueries});out body;`;
+
+    const ovRes=await fetch('https://overpass-api.de/api/interpreter',{
+      method:'POST',
+      body:'data='+encodeURIComponent(query),
+      signal:AbortSignal.timeout(20000)
+    });
+    const ovData=await ovRes.json();
+    const elements=ovData.elements||[];
+
+    return elements
+      .filter(el=>el.tags&&el.tags.name)
+      .map(el=>({
+        name:el.tags.name||'',
+        phone:el.tags.phone||el.tags['contact:phone']||'',
+        website:el.tags.website||el.tags['contact:website']||'',
+        email:el.tags.email||el.tags['contact:email']||'',
+        address:[el.tags['addr:housenumber'],el.tags['addr:street'],el.tags['addr:city']].filter(Boolean).join(', '),
+        source:'Overpass'
+      }));
+  }catch(e){
+    console.warn('Overpass failed:',e.message);
+    return [];
+  }
+}
+
+async function fetchYell(location, niche){
+  try{
+    const d = await workerFetch('scout_yell',{ keyword: niche, location });
+    if(d.ok && d.results) return d.results;
+    return [];
+  }catch(e){
+    console.warn('Yell failed:',e.message);
+    return [];
+  }
+}
+
+async function fetchYelp(location, niche){
+  try{
+    const d = await workerFetch('scout_yelp',{ keyword: niche, location });
+    if(d.ok && d.results) return d.results;
+    return [];
+  }catch(e){
+    console.warn('Yelp failed:',e.message);
+    return [];
+  }
+}
+
+async function fetchAllSources(location, niche, logFn){
+  logFn(`🔵 SCOUT firing all sources — BizData + Overpass + Yell + Yelp`,'i');
+
+  // Run all four in parallel
+  const [bizResults, ovResults, yellResults, yelpResults] = await Promise.allSettled([
+    fetchBizData(location, niche),
+    fetchOverpass(location, niche),
+    fetchYell(location, niche),
+    fetchYelp(location, niche)
+  ]);
+
+  const biz  = bizResults.status==='fulfilled'  ? bizResults.value  : [];
+  const ov   = ovResults.status==='fulfilled'   ? ovResults.value   : [];
+  const yell = yellResults.status==='fulfilled' ? yellResults.value : [];
+  const yelp = yelpResults.status==='fulfilled' ? yelpResults.value : [];
+
+  logFn(`BizData: ${biz.length} | Overpass: ${ov.length} | Yell: ${yell.length} | Yelp: ${yelp.length}`,'i');
+
+  // Merge and deduplicate by normalised name
+  const seen = new Set();
+  const merged = [];
+  for(const b of [...biz, ...ov, ...yell, ...yelp]){
+    const key = (b.name||'').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,20);
+    if(!key || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(b);
+  }
+
+  logFn(`✅ Combined: ${merged.length} unique businesses from 4 sources`,'s');
+  return merged;
+}
+
 // Pipeline versions of scout/forge/launch that use state directly
 async function runScoutForPipeline(location, niche){
   STATE.leads=[];STATE.binned=[];STATE.scoutStopped=false;
   try{
-    const res=await fetch(`https://bizdata-web.vercel.app/api/businesses?location=${encodeURIComponent(location)}&category=${niche}&limit=500`);
-    const data=await res.json();
-    const businesses=data.businesses||[];
-    pipelineLog(`BizData: ${businesses.length} businesses found`,'i');
+    const businesses=await fetchAllSources(location, niche, pipelineLog);
+    pipelineLog(`SCOUT: ${businesses.length} total businesses to process`,'i');
     for(let i=0;i<businesses.length;i++){
       if(pipelineStopped)break;
       const biz=businesses[i];
@@ -1139,13 +1267,11 @@ async function runScoutForPipeline(location, niche){
         const html=await scrapeUrl(biz.website);
         email=extractEmails(html)[0]||'';
       }
-      const lead={'Name':biz.name||'','address':biz.address||'','Phone':biz.phone||'','Website':biz.website||'','Email':email||'','Niche':niche,'Location':location,'Lead_temp':!biz.website&&!email?'HOT':email?'WARM':'COLD','Email_found':!!email,'Created_at':new Date().toISOString(),name:biz.name||'',phone:biz.phone||'',website:biz.website||'',email:email||'',niche:niche,location:location};
+      const lead={'Name':biz.name||'','address':biz.address||'','Phone':biz.phone||'','Website':biz.website||'','Email':email||'','Niche':niche,'Location':location,'Lead_temp':!biz.website&&!email?'HOT':email?'WARM':'COLD','Email_found':!!email,'Created_at':new Date().toISOString(),name:biz.name||'',phone:biz.phone||'',website:biz.website||'',email:email||'',niche:niche,location:location,data_source:biz.source||''};
       try{const saved=await sbInsert('scout_leads',lead);lead.id=saved?.id}catch{}
       if(!biz.website){
-        // ── TRACK 1: No website — send to SENTINEL for email recovery
         STATE.binned.push({...lead,track:1,attempted:'No website'});
       } else {
-        // ── TRACK 2: Has website — try to get email from Google listing
         if(email){
           lead.track=2;
           STATE.leads.push(lead);
@@ -2338,15 +2464,13 @@ async function startScout(){
   if(currentAgent?.id==='SCOUT')renderAgentPanel('SCOUT');
 
   try{
-    const res=await fetch(`https://bizdata-web.vercel.app/api/businesses?location=${encodeURIComponent(location)}&category=${niche}&limit=500`);
-    const data=await res.json();
-    const businesses=data.businesses||[];
-    addLog('SCOUT',`BizData returned ${businesses.length} businesses`,'s');
+    const businesses=await fetchAllSources(location, niche, (msg,type)=>addLog('SCOUT',msg,type));
+    addLog('SCOUT',`Processing ${businesses.length} businesses from all sources`,'s');
 
     for(let i=0;i<businesses.length;i++){
       if(STATE.scoutStopped)break;
       const biz=businesses[i];
-      pBar('SCOUT',Math.round((i+1)/businesses.length*100),`${i+1}/${businesses.length} — ${biz.name||''}`);
+      pBar('SCOUT',Math.round((i+1)/businesses.length*100),`${i+1}/${businesses.length} — ${biz.name||''} [${biz.source||''}]`);
       let email=biz.email||'';
       if(!email&&biz.website){
         const html=await scrapeUrl(biz.website);
@@ -2357,7 +2481,7 @@ async function startScout(){
           email=extractEmails(html2)[0]||'';
         }
       }
-      const lead={'Name':biz.name||'','address':biz.address||'','Phone':biz.phone||'','Website':biz.website||'','Email':email||'','Niche':niche,'Location':location,'Lead_temp':!biz.website&&!email?'HOT':email?'WARM':'COLD','Email_found':!!email,'Created_at':new Date().toISOString(),name:biz.name||'',phone:biz.phone||'',website:biz.website||'',email:email||'',niche:niche,location:location};
+      const lead={'Name':biz.name||'','address':biz.address||'','Phone':biz.phone||'','Website':biz.website||'','Email':email||'','Niche':niche,'Location':location,'Lead_temp':!biz.website&&!email?'HOT':email?'WARM':'COLD','Email_found':!!email,'Created_at':new Date().toISOString(),name:biz.name||'',phone:biz.phone||'',website:biz.website||'',email:email||'',niche:niche,location:location,data_source:biz.source||''};
       try{
         const saved=await sbInsert('scout_leads',lead);
         lead.id=saved?.id;
