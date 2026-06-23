@@ -1060,15 +1060,217 @@ function stopPipeline(){
   },1000);
 }
 
+// ═══════════════════════════════════════════
+// TEST PIPELINE — isolated, no Supabase writes
+// Completely separate from real pipeline
+// ═══════════════════════════════════════════
+async function runTestPipeline(){
+  const demoEmail = document.getElementById('galaxy-demo-email')?.value?.trim();
+  if(!demoEmail){ 
+    alert('Enter your demo email first');
+    return;
+  }
+
+  pipelineRunning=true;
+  pipelineStopped=false;
+  activationModal.style.display='none';
+
+  // Show pill
+  let pill=document.getElementById('pipeline-pill');
+  if(!pill){
+    pill=document.createElement('div');
+    pill.id='pipeline-pill';
+    pill.style.cssText='position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:300;background:rgba(6,10,24,0.95);border:1px solid rgba(0,255,136,0.35);border-radius:20px;padding:6px 14px;font-size:8px;letter-spacing:1.5px;color:#00FF88;cursor:pointer;font-family:"Share Tech Mono",monospace;white-space:nowrap';
+    pill.onclick=()=>{ activationModal.style.display='flex'; };
+    document.body.appendChild(pill);
+  }
+  pill.textContent='🧪 TEST RUNNING — tap to view log';
+  pill.style.display='block';
+  pill.style.borderColor='rgba(0,255,136,0.35)';
+  pill.style.color='#00FF88';
+
+  // Reset counters
+  STATE.stats={leads:0,built:0,live:0,sent:0};
+  updateBottomBar();
+
+  pipelineLog('🧪 TEST PIPELINE — isolated run, no real data saved','s');
+  pipelineLog(`📧 Email will arrive at: ${demoEmail}`,'i');
+
+  // ── FAKE LEAD — no scraping, no Supabase
+  const testLead = {
+    name: 'The Test Kitchen',
+    niche: 'restaurant',
+    location: 'Manchester',
+    phone: '0161 000 0000',
+    email: demoEmail,
+    address: '1 Test Street, Manchester',
+    website: '',
+    track: 2,
+    id: null
+  };
+
+  pipelineLog('🔵 SCOUT — using test lead: The Test Kitchen, Manchester','s');
+  setNodeStatus('SCOUT','DONE');
+  STATE.leads=[testLead];
+  STATE.stats.leads=1;
+  updateBottomBar();
+
+  await new Promise(r=>setTimeout(r,500));
+  if(pipelineStopped) return cleanup();
+
+  // ── SCANNER Phase 1 — quick niche confirm, no scraping
+  pipelineLog('🟤 SCANNER — verifying test lead niche','i');
+  setNodeStatus('SCANNER','RUNNING');
+  testLead.template_override='Restaurant';
+  testLead.scanner_intel={ detected_niche:'restaurant', template:'Restaurant', phone:testLead.phone, email:demoEmail };
+  await new Promise(r=>setTimeout(r,500));
+  pipelineLog('🟤 SCANNER Phase 1 — niche: restaurant → template: Restaurant','s');
+  setNodeStatus('SCANNER','DONE');
+
+  if(pipelineStopped) return cleanup();
+
+  // ── FORGE — build site (AI if credits on, template if not)
+  pipelineLog(`🔴 FORGE — ${STATE.forgeCreditsOn?'AI building bespoke site':'building from template'}...`,'i');
+  setNodeStatus('FORGE','RUNNING');
+  let html='';
+  try{
+    if(STATE.forgeCreditsOn){
+      const d=await workerFetch('generate_site',{
+        name:testLead.name,
+        niche:testLead.niche,
+        location:testLead.location,
+        phone:testLead.phone,
+        email:demoEmail,
+        address:testLead.address
+      });
+      if(d.ok && d.html && d.html.length>500){
+        html=d.html;
+        pipelineLog('🔴 FORGE — AI bespoke site generated','s');
+      } else {
+        throw new Error('AI returned invalid HTML');
+      }
+    } else {
+      html=buildSiteHTML(testLead);
+      pipelineLog('🔴 FORGE — template site built','s');
+    }
+  }catch(e){
+    html=buildSiteHTML(testLead);
+    pipelineLog(`🔴 FORGE — fell back to template: ${e.message}`,'w');
+  }
+  STATE.stats.built=1;
+  updateBottomBar();
+  setNodeStatus('FORGE','DONE');
+
+  if(pipelineStopped) return cleanup();
+
+  // ── LAUNCH — deploy to GitHub Pages
+  pipelineLog('🟢 LAUNCH — deploying test site to GitHub Pages...','i');
+  setNodeStatus('LAUNCH','RUNNING');
+  let liveUrl='';
+  try{
+    const ghToken=STATE.githubToken||localStorage.getItem('galaxy_github_token');
+    const GITHUB_USER='themarketinginninbox';
+    const repo='galaxy-test-kitchen';
+    try{await githubReq('/user/repos','POST',{name:repo,private:false,auto_init:false})}catch{}
+    await new Promise(r=>setTimeout(r,1500));
+    const encoded=btoa(unescape(encodeURIComponent(html)));
+    let sha=null;
+    try{const ex=await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`);sha=ex?.sha}catch{}
+    const pb={message:'GALAXY TEST',content:encoded};if(sha)pb.sha=sha;
+    await githubReq(`/repos/${GITHUB_USER}/${repo}/contents/index.html`,'PUT',pb);
+    try{await githubReq(`/repos/${GITHUB_USER}/${repo}/pages`,'POST',{source:{branch:'main',path:'/'}})}catch{}
+    liveUrl=`https://${GITHUB_USER}.github.io/${repo}/`;
+    pipelineLog(`🟢 LAUNCH — live at ${liveUrl}`,'s');
+    STATE.stats.live=1;
+    updateBottomBar();
+  }catch(e){
+    pipelineLog(`🟢 LAUNCH failed: ${e.message}`,'e');
+    liveUrl='https://thewebsiteinn.co.uk';
+  }
+  setNodeStatus('LAUNCH','DONE');
+
+  if(pipelineStopped) return cleanup();
+
+  // ── SCANNER Phase 2 — proof check (simulated)
+  pipelineLog('🟤 SCANNER Phase 2 — proofing test site','i');
+  setNodeStatus('SCANNER','RUNNING');
+  await new Promise(r=>setTimeout(r,1000));
+  pipelineLog('🟤 SCANNER — test site approved ✅','s');
+  setNodeStatus('SCANNER','DONE');
+
+  if(pipelineStopped) return cleanup();
+
+  // ── DISPATCH — send email to demo address
+  pipelineLog(`🟠 DISPATCH — sending test email to ${demoEmail}...`,'i');
+  setNodeStatus('DISPATCH','RUNNING');
+  try{
+    const workerUrl=STATE.workerUrl||localStorage.getItem('galaxy_worker_url');
+    if(!workerUrl) throw new Error('No worker URL configured');
+
+    const campaignId=STATE.instantlyCampaignId||localStorage.getItem('galaxy_instantly_campaign_id');
+    if(!campaignId) throw new Error('No campaign ID — run DISPATCH once first to create campaign');
+
+    const r=await fetch(workerUrl,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        action:'add_lead',
+        campaign_id:campaignId,
+        email:demoEmail,
+        business_name:testLead.name,
+        live_url:liveUrl
+      })
+    });
+    const d=await r.json();
+    if(d.ok){
+      pipelineLog(`🟠 DISPATCH — test email dispatched to ${demoEmail} ✅`,'s');
+      STATE.stats.sent=1;
+      updateBottomBar();
+    } else {
+      pipelineLog(`🟠 DISPATCH error: ${JSON.stringify(d.error)}`,'e');
+    }
+  }catch(e){
+    pipelineLog(`🟠 DISPATCH failed: ${e.message}`,'e');
+  }
+  setNodeStatus('DISPATCH','DONE');
+
+  pipelineLog('🧪 TEST COMPLETE — check your inbox','s');
+  addLog('SAM','Test pipeline complete — check inbox for test email','s');
+
+  cleanup();
+}
+
+function cleanup(){
+  pipelineRunning=false;
+  pipelineStopped=false;
+  singleDemoMode=false;
+  SESSION_QUEUE=[];
+  setTimeout(()=>{
+    resetSwitch();
+    hidePipelineToast();
+    activationModal.style.display='none';
+    const pill=document.getElementById('pipeline-pill');
+    if(pill){ pill.textContent='🧪 TEST COMPLETE — tap to view log'; }
+    const check=document.getElementById('single-demo-check');
+    const note=document.getElementById('single-demo-note');
+    const wrap=document.getElementById('single-demo-wrap');
+    if(check){ check.innerHTML=''; check.style.background='transparent'; }
+    if(note) note.style.display='none';
+    if(wrap) wrap.style.borderColor='rgba(0,255,136,0.15)';
+    setDemoModeUI(false);
+  },3000);
+}
+
 async function runSingleSession(location, niche, sessionNum, totalSessions){
   const prog = document.getElementById('session-progress');
   if(prog) prog.textContent = `SESSION ${sessionNum}/${totalSessions} — ${location.toUpperCase()} / ${niche.toUpperCase()}`;
 
   // Reset per-session STATE
   STATE.leads=[];STATE.binned=[];STATE.forgeQueue=[];STATE.launchQueue=[];
-  STATE.scannerQueue=[];STATE.dispatchQueue=[];STATE.scannerIntel=[];
-  STATE.sentLog=[];STATE.stats={leads:0,built:0,live:0,sent:0};
-  launchedBusinessNames=null; // clear processed business cache
+  STATE.scannerQueue=[];STATE.dispatchQueue=[];STATE.sentLog=[];STATE.scannerIntel=[];
+  STATE.stats={leads:0,built:0,live:0,sent:0};
+  launchedBusinessNames=null;
+  parallelQueue.length=0; // clear any queued parallel leads
   pipelineStopped=false;
   STATE.scoutStopped=false;STATE.forgeStopped=false;STATE.launchStopped=false;
   STATE.scannerStopped=false;STATE.dispatchStopped=false;
@@ -1165,6 +1367,14 @@ async function confirmActivation(){
       document.getElementById('galaxy-location').style.borderColor='#FF3355';
       return;
     }
+  }
+
+  // Single demo — route to isolated test pipeline
+  if(singleDemoMode){
+    STATE.demoMode=true;
+    STATE.demoEmail=demoEmail;
+    runTestPipeline();
+    return;
   }
 
   // Set global state
@@ -1320,6 +1530,10 @@ async function getlaunchedNames(){
 }
 
 async function triggerParallelPipeline(lead){
+  // Don't queue empty leads
+  if(!lead || !lead.name && !lead.Name && !lead.business_name) return;
+  // Single demo — stop queueing after first dispatch
+  if(singleDemoMode && STATE.stats.sent >= 1) return;
   parallelQueue.push(lead);
   if(parallelRunning)return; // already processing queue
   parallelRunning=true;
@@ -1421,6 +1635,21 @@ async function triggerParallelPipeline(lead){
                 STATE.stats.sent++;updateBottomBar();
                 pipelineLog(`🟠 DISPATCH: Dispatched → ${toEmail}`,'s');
                 if(launchRow?.id)await sbUpdate('dispatch_queue',launchRow.id,{status:'sent',sent_at:new Date().toISOString()});
+                // Single demo — stop after first successful dispatch
+                if(singleDemoMode){
+                  pipelineLog('✅ SINGLE DEMO COMPLETE — 1 lead processed end to end','s');
+                  pipelineStopped=true;
+                  setTimeout(()=>{
+                    pipelineRunning=false;singleDemoMode=false;SESSION_QUEUE=[];
+                    resetSwitch();hidePipelineToast();activationModal.style.display='none';
+                    const check=document.getElementById('single-demo-check');
+                    const note=document.getElementById('single-demo-note');
+                    const wrap=document.getElementById('single-demo-wrap');
+                    if(check){check.innerHTML='';check.style.background='transparent';}
+                    if(note) note.style.display='none';
+                    if(wrap) wrap.style.borderColor='rgba(0,255,136,0.15)';
+                  },3000);
+                }
               } else {
                 pipelineLog(`🟠 DISPATCH: Lead error — ${JSON.stringify(addData)}`,'e');
               }
@@ -1598,7 +1827,10 @@ async function runScoutForPipeline(location, niche){
         if(email){
           lead.track=2;
           STATE.leads.push(lead);
-          triggerParallelPipeline(lead);
+          // Single demo — only trigger pipeline for first lead
+          if(!singleDemoMode || STATE.leads.length === 1){
+            triggerParallelPipeline(lead);
+          }
         } else {
           STATE.binned.push({...lead,track:2,attempted:'Has website, no email found'});
         }
