@@ -2000,27 +2000,80 @@ function renderLaunchPanel(){
 // SCANNER PANEL
 function renderScannerPanel(){
   const q=STATE.scannerQueue;
+  const p1=STATE.leads?STATE.leads.filter(l=>l.scanner_intel):[];
+  const phase1Active=STATE.scannerRunning&&STATE.scannerPhase===1;
+  const phase2Active=STATE.scannerRunning&&STATE.scannerPhase===2;
+
+  // Niche colour map
+  const nicheColor={restaurant:'#C9A84C',cafe:'#C9A84C',takeaway:'#FF6B35',beauty:'#E91E8C',trades:'#00B4D8',retail:'#9B59B6',fitness:'#00FF88',health:'#00FF88',automotive:'#00B4D8',cleaning:'#00B4D8'};
+
   return `
   <div class="p-stats">
-    <div class="p-stat"><span class="v" style="color:var(--scanner)">${q.length}</span><span class="l">TOTAL</span></div>
-    <div class="p-stat"><span class="v" style="color:var(--green)">${q.filter(i=>i.status==='approved').length}</span><span class="l">APPROVED</span></div>
-    <div class="p-stat"><span class="v" style="color:var(--red)">${q.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div>
+    <div class="p-stat"><span class="v" style="color:#00B4D8">${p1.length}</span><span class="l">P1 VERIFIED</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--green)">${q.filter(i=>i.status==='approved').length}</span><span class="l">P2 APPROVED</span></div>
     <div class="p-stat"><span class="v" style="color:var(--amber)">${q.filter(i=>i.status==='requeued').length}</span><span class="l">REQUEUED</span></div>
+    <div class="p-stat"><span class="v" style="color:var(--red)">${q.filter(i=>i.status==='failed').length}</span><span class="l">FAILED</span></div>
   </div>
+
+  <!-- Phase indicators -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+    <div style="border:1px solid ${phase1Active?'rgba(0,180,216,0.6)':'rgba(0,180,216,0.15)'};border-radius:6px;padding:8px;background:${phase1Active?'rgba(0,180,216,0.08)':'transparent'};transition:all 0.3s">
+      <div style="font-size:7px;letter-spacing:2px;color:${phase1Active?'#00B4D8':'rgba(192,200,216,0.3)'};margin-bottom:4px">PHASE 1</div>
+      <div style="font-size:9px;color:${phase1Active?'#fff':'rgba(192,200,216,0.3)'}">INTELLIGENCE</div>
+      <div style="font-size:7px;color:rgba(192,200,216,0.4);margin-top:2px">Niche · Scrape · Enrich</div>
+      ${phase1Active?'<div style="width:100%;height:2px;background:rgba(0,180,216,0.15);border-radius:1px;margin-top:6px"><div style="height:2px;background:#00B4D8;border-radius:1px;animation:pulse 1s infinite"></div></div>':''}
+      ${!STATE.scannerRunning&&p1.length?`<div style="font-size:7px;color:#00FF88;margin-top:4px">✓ ${p1.length} verified</div>`:''}
+    </div>
+    <div style="border:1px solid ${phase2Active?'rgba(184,134,11,0.6)':'rgba(184,134,11,0.15)'};border-radius:6px;padding:8px;background:${phase2Active?'rgba(184,134,11,0.08)':'transparent'};transition:all 0.3s">
+      <div style="font-size:7px;letter-spacing:2px;color:${phase2Active?'#B8860B':'rgba(192,200,216,0.3)'};margin-bottom:4px">PHASE 2</div>
+      <div style="font-size:9px;color:${phase2Active?'#fff':'rgba(192,200,216,0.3)'}">PROOF CHECK</div>
+      <div style="font-size:7px;color:rgba(192,200,216,0.4);margin-top:2px">Verify · Match · Approve</div>
+      ${phase2Active?'<div style="width:100%;height:2px;background:rgba(184,134,11,0.15);border-radius:1px;margin-top:6px"><div style="height:2px;background:#B8860B;border-radius:1px;animation:pulse 1s infinite"></div></div>':''}
+      ${!STATE.scannerRunning&&q.filter(i=>i.status==='approved').length?`<div style="font-size:7px;color:#00FF88;margin-top:4px">✓ ${q.filter(i=>i.status==='approved').length} approved</div>`:''}
+    </div>
+  </div>
+
   ${STATE.scannerRunning
-    ?`<div class="running-badge active"><div class="rb-dot"></div>SCANNER CHECKING QUALITY</div>
-      <div class="pipeline-note" style="margin-bottom:12px">Checking each live site before it goes to DISPATCH. Approved sites enter the email queue instantly.</div>
-      <button class="p-btn stop" onclick="STATE.disabled['SCANNER']?enableAgent('SCANNER'):stopAgent('SCANNER')" style="${STATE.disabled&&STATE.disabled['SCANNER']?'background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.4);color:#00FF88':''}">${STATE.disabled&&STATE.disabled['SCANNER']?'▶ RESUME SCANNER':'⬛ STOP SCANNER'}</button>`
-    :`<div class="pipeline-note">SCANNER activates automatically when LAUNCH deploys a site. No manual input needed.</div>`
+    ?`<div class="running-badge active"><div class="rb-dot"></div>${phase1Active?'PHASE 1 — SCANNING BUSINESS INTEL':'PHASE 2 — PROOF CHECKING SITES'}</div>
+      <button class="p-btn stop" onclick="STATE.disabled['SCANNER']?enableAgent('SCANNER'):stopAgent('SCANNER')" style="margin-top:8px;${STATE.disabled&&STATE.disabled['SCANNER']?'background:rgba(0,255,136,0.1);border-color:rgba(0,255,136,0.4);color:#00FF88':''}">${STATE.disabled&&STATE.disabled['SCANNER']?'▶ RESUME':'⬛ STOP SCANNER'}</button>`
+    :`<div class="pipeline-note">SCANNER runs twice — before FORGE to verify niches, and after LAUNCH to proof sites before dispatch.</div>`
   }
+
   <div class="p-progress" id="prog-SCANNER"><div class="p-progress-label" id="progl-SCANNER"></div><div class="p-progress-bg"><div class="p-progress-fill" id="progf-SCANNER"></div></div></div>
   <div class="p-log" id="log-SCANNER"></div>
+
+  <!-- Phase 1 Intel Table -->
+  ${p1.length?`
+  <div class="p-table-wrap" style="margin-bottom:8px">
+    <div class="p-table-head" style="color:#00B4D8">PHASE 1 — VERIFIED INTEL (${p1.length})</div>
+    <div style="overflow-x:auto;max-height:160px;overflow-y:auto">
+      <table class="p-table">
+        <thead><tr><th>Business</th><th>Niche</th><th>Template</th><th>Data</th></tr></thead>
+        <tbody>${p1.slice(0,15).map(l=>{
+          const si=l.scanner_intel||{};
+          const nc=nicheColor[si.detected_niche]||'#00B4D8';
+          return `<tr>
+            <td style="color:#fff">${l.name||'—'}</td>
+            <td><span style="font-size:7px;padding:2px 5px;border-radius:3px;background:${nc}22;color:${nc};border:1px solid ${nc}44">${si.detected_niche||'—'}</span></td>
+            <td style="font-size:8px;color:rgba(192,200,216,0.6)">${si.template||'—'}</td>
+            <td style="font-size:8px">${si.phone?'📞':''} ${si.email?'📧':''}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
+  </div>`:''}
+
+  <!-- Phase 2 Proof Table -->
   <div class="p-table-wrap">
-    <div class="p-table-head">SCAN RESULTS (${q.length})</div>
-    <div style="overflow-x:auto;max-height:180px;overflow-y:auto">
+    <div class="p-table-head" style="color:#B8860B">PHASE 2 — PROOF RESULTS (${q.length})</div>
+    <div style="overflow-x:auto;max-height:160px;overflow-y:auto">
       <table class="p-table">
         <thead><tr><th>Business</th><th>Checks</th><th>Result</th></tr></thead>
-        <tbody>${q.length?q.slice(0,15).map(i=>`<tr><td style="color:#fff">${i.business_name||'—'}</td><td style="font-size:8px">${i.checks?Object.values(i.checks).filter(Boolean).length+'/4':'—'}</td><td><span class="badge ${i.status==='approved'?'ok':i.status==='failed'?'fail':'pend'}">${i.status?.toUpperCase()||'—'}</span></td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO SCANS YET</div></td></tr>'}</tbody>
+        <tbody>${q.length?q.slice(0,15).map(i=>`<tr>
+          <td style="color:#fff">${i.business_name||'—'}</td>
+          <td style="font-size:8px">${i.checks?Object.values(i.checks).filter(Boolean).length+'/4':'—'}</td>
+          <td><span class="badge ${i.status==='approved'?'ok':i.status==='failed'?'fail':'pend'}">${i.status?.toUpperCase()||'—'}</span></td>
+        </tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ AWAITING PHASE 2</div></td></tr>'}</tbody>
       </table>
     </div>
   </div>`;
@@ -2882,6 +2935,7 @@ function mapNicheToTemplate(niche){
 }
 
 async function runScannerPhase1(){
+  STATE.scannerPhase=1;
   setNodeStatus('SCANNER','RUNNING');
   addLog('SCANNER','Phase 1 — verifying niches and scraping business intel','s');
   if(currentAgent?.id==='SCANNER')renderAgentPanel('SCANNER');
@@ -2975,9 +3029,9 @@ async function runScannerPhase1(){
 }
 
 async function startScanner(){
-  STATE.scannerRunning=true;STATE.scannerStopped=false;
+  STATE.scannerRunning=true;STATE.scannerStopped=false;STATE.scannerPhase=2;
   setNodeStatus('SCANNER','RUNNING');
-  addLog('SCANNER','Scanner started','s');
+  addLog('SCANNER','Phase 2 — proof checking deployed sites','s');
   if(currentAgent?.id==='SCANNER')renderAgentPanel('SCANNER');
 
   try{
