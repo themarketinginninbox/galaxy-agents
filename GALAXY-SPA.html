@@ -1114,6 +1114,21 @@ async function runSingleSession(location, niche, sessionNum, totalSessions){
   if(singleDemoMode && STATE.sentLog.length > 0){
     pipelineLog('✅ SINGLE DEMO COMPLETE — pipeline stopped after first lead','s');
     pipelineStopped=true;
+    // Auto reset switch since we bypass the normal completion block
+    setTimeout(()=>{
+      pipelineRunning=false;
+      singleDemoMode=false;
+      SESSION_QUEUE=[];
+      resetSwitch();
+      hidePipelineToast();
+      activationModal.style.display='none';
+      const check=document.getElementById('single-demo-check');
+      const note=document.getElementById('single-demo-note');
+      const wrap=document.getElementById('single-demo-wrap');
+      if(check){ check.innerHTML=''; check.style.background='transparent'; }
+      if(note) note.style.display='none';
+      if(wrap) wrap.style.borderColor='rgba(0,255,136,0.15)';
+    },3000);
   }
 
   // Save to Supabase session log for SAM tracking
