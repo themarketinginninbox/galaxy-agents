@@ -715,7 +715,12 @@ const activationModal=document.createElement('div');
 activationModal.style.cssText='position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:rgba(1,2,8,0.9);backdrop-filter:blur(8px)';
 activationModal.innerHTML=`
 <div style="background:rgba(6,10,24,0.98);border:1px solid rgba(0,180,216,0.3);border-radius:16px;padding:28px 24px;width:calc(100% - 48px);max-width:420px;max-height:90vh;overflow-y:auto">
-  <div style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;color:#00B4D8;letter-spacing:4px;margin-bottom:4px">🧠 GALAXY</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+    <div style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;color:#00B4D8;letter-spacing:4px">🧠 GALAXY</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="activationModal.style.display='none'" style="background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:rgba(192,200,216,0.6);font-family:'Share Tech Mono',monospace;font-size:9px;padding:5px 10px;cursor:pointer;letter-spacing:1px">✕ CLOSE</button>
+    </div>
+  </div>
   <div style="font-size:9px;letter-spacing:2px;color:rgba(192,200,216,0.4);margin-bottom:20px">SESSION QUEUE — FULL PIPELINE</div>
 
   <!-- DEMO MODE -->
@@ -860,6 +865,21 @@ function activatePipeline(){
   renderSessionQueue();
   activationModal.style.display='flex';
 }
+
+function minimiseActivationModal(){
+  activationModal.style.display='none';
+  // Show floating restore pill if pipeline is running
+  let pill=document.getElementById('pipeline-restore-pill');
+  if(!pill){
+    pill=document.createElement('div');
+    pill.id='pipeline-restore-pill';
+    pill.style.cssText='position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:400;background:rgba(0,180,216,0.15);border:1px solid rgba(0,180,216,0.4);border-radius:20px;padding:6px 16px;font-size:8px;letter-spacing:2px;color:#00B4D8;font-family:"Share Tech Mono",monospace;cursor:pointer;display:none';
+    pill.textContent='● PIPELINE RUNNING — TAP TO RESTORE';
+    pill.onclick=()=>{ activationModal.style.display='flex'; pill.style.display='none'; };
+    document.body.appendChild(pill);
+  }
+  runPill.style.display='block';
+}
 function closeActivationModal(){
   if(!pipelineRunning){
     activationModal.style.display='none';
@@ -984,7 +1004,22 @@ async function confirmActivation(){
   pipelineRunning=true;
   pipelineStopped=false;
 
-  // Show pipeline status
+  // Close modal — user watches dashboard while pipeline runs
+  activationModal.style.display='none';
+
+  // Show a persistent pill so they can reopen the log
+  let pill=document.getElementById('pipeline-pill');
+  if(!pill){
+    pill=document.createElement('div');
+    pill.id='pipeline-pill';
+    pill.style.cssText='position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:300;background:rgba(6,10,24,0.95);border:1px solid rgba(0,180,216,0.35);border-radius:20px;padding:6px 14px;font-size:8px;letter-spacing:1.5px;color:#00B4D8;cursor:pointer;font-family:"Share Tech Mono",monospace;white-space:nowrap';
+    pill.onclick=()=>{ activationModal.style.display='flex'; };
+    document.body.appendChild(pill);
+  }
+  pill.textContent='● GALAXY RUNNING — tap to view log';
+  pill.style.display='block';
+
+  // Show pipeline status inside modal for when user reopens it
   document.getElementById('pipeline-status').style.display='block';
   document.getElementById('session-progress').style.display='block';
 
@@ -1011,6 +1046,10 @@ async function confirmActivation(){
   SESSION_QUEUE=[];
   pipelineLog(`✅ ALL SESSIONS COMPLETE`,'s');
   addLog('SAM',`All ${total} sessions complete`,'s');
+  const completePill=document.getElementById('pipeline-pill');
+  if(completePill) completePill.textContent='✅ GALAXY COMPLETE — tap to view log';
+  const restorePill=document.getElementById('pipeline-restore-pill');
+  if(pill) pill.style.display='none';
 
   // Reset switch and hide overlays after 3s
   setTimeout(()=>{
