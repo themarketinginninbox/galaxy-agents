@@ -2386,10 +2386,15 @@ async function resetGalaxy(){
     }
     keysToRemove.forEach(k=>localStorage.removeItem(k));
 
-    // 4. Clear in-memory STATE completely
+    // 4. Clear all localStorage lifetime stats
+    ['galaxy_lt_leads','galaxy_lt_built','galaxy_lt_live','galaxy_lt_sent','galaxy_lt_sales','galaxy_lt_revenue'].forEach(k=>localStorage.removeItem(k));
+
+    // 5. Clear in-memory STATE completely
     STATE.leads=[];STATE.binned=[];STATE.forgeQueue=[];STATE.launchQueue=[];
     STATE.scannerQueue=[];STATE.dispatchQueue=[];STATE.sentLog=[];
     STATE.scannerIntel=[];STATE.samReplies=[];STATE.instantlyCampaignId=null;
+    STATE.sessionLog=[];
+    STATE.lifetime={leads:0,built:0,live:0,sent:0,sales:0,revenue:0};
     STATE.stats={leads:0,built:0,live:0,sent:0};
     launchedBusinessNames=null;
     updateBottomBar();
