@@ -333,8 +333,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 </div>
 
 <!-- SETTINGS BUTTON -->
-<div id="settings-btn" ontouchstart="openSettings()" onclick="openSettings()" style="position:fixed;bottom:72px;right:12px;z-index:500;background:rgba(0,180,216,0.12);border:1px solid rgba(0,180,216,0.35);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:8px;padding:4px 8px;cursor:pointer;letter-spacing:1px;user-select:none;-webkit-user-select:none;touch-action:manipulation">⚙ SETTINGS</div>
-<div id="feed-toggle-btn" ontouchstart="toggleFeed()" onclick="toggleFeed()" style="position:fixed;bottom:72px;left:12px;z-index:500;background:rgba(0,180,216,0.12);border:1px solid rgba(0,180,216,0.35);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:8px;padding:4px 8px;cursor:pointer;letter-spacing:1px;user-select:none;-webkit-user-select:none;touch-action:manipulation">▶ FEED</div>
+<div id="settings-btn" ontouchstart="event.preventDefault();openSettings()" onclick="openSettings()" style="position:fixed;bottom:72px;right:12px;z-index:500;background:rgba(0,180,216,0.12);border:1px solid rgba(0,180,216,0.35);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:8px;padding:4px 8px;cursor:pointer;letter-spacing:1px;user-select:none;-webkit-user-select:none;touch-action:manipulation">⚙ SETTINGS</div>
+<div id="feed-toggle-btn" ontouchstart="event.preventDefault();toggleFeed()" onclick="toggleFeed()" style="position:fixed;bottom:72px;left:12px;z-index:500;background:rgba(0,180,216,0.12);border:1px solid rgba(0,180,216,0.35);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:8px;padding:4px 8px;cursor:pointer;letter-spacing:1px;user-select:none;-webkit-user-select:none;touch-action:manipulation">▶ FEED</div>
 
 <!-- SITE PREVIEW MODAL -->
 <div id="preview-modal" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(1,2,8,0.95);flex-direction:column">
@@ -820,18 +820,35 @@ function initGalaxyHold(){
     hideHoldRing();
   }
 
+  let touchStartTime=0;
   galaxyNode.addEventListener('touchstart',e=>{
     e.stopPropagation();
+    touchStartTime=Date.now();
     const t=e.touches[0];
     startHold(t.clientX,t.clientY);
   },{passive:true});
-  galaxyNode.addEventListener('touchend',e=>{e.stopPropagation();cancelHold()},{passive:true});
+  galaxyNode.addEventListener('touchend',e=>{
+    e.stopPropagation();
+    const elapsed=Date.now()-touchStartTime;
+    cancelHold();
+    // Short tap (<400ms) = open GALAXY panel
+    if(elapsed<400){
+      openPanel('GALAXY');
+    }
+    // Long hold (>=400ms) handled by holdInterval firing activatePipeline
+  },{passive:true});
   galaxyNode.addEventListener('touchcancel',e=>{e.stopPropagation();cancelHold()},{passive:true});
   galaxyNode.addEventListener('mousedown',e=>{e.stopPropagation();startHold(e.clientX,e.clientY)});
-  galaxyNode.addEventListener('mouseup',e=>{e.stopPropagation();cancelHold()});
+  galaxyNode.addEventListener('mouseup',e=>{
+    e.stopPropagation();
+    cancelHold();
+  });
   galaxyNode.addEventListener('mouseleave',e=>{cancelHold()});
-  // Override the touchstart openPanel — GALAXY opens modal not panel
-  galaxyNode.onclick=null;
+  // Desktop click = open panel
+  galaxyNode.onclick=(e)=>{
+    e.stopPropagation();
+    openPanel('GALAXY');
+  };
 }
 
 // ACTIVATION MODAL
@@ -2134,15 +2151,16 @@ function toggleFeed(){
 function updateMiniLog(msg,type='i'){
   const el=document.getElementById('pipeline-mini-log');
   // Auto-open feed when pipeline starts if not manually closed
+  const colors={s:'#00FF88',w:'#FFAA00',e:'#FF3355',i:'#4AB3FF'};
+  const time=new Date().toTimeString().slice(0,8);
+  el.innerHTML=`<div class="pml-line" style="color:${colors[type]||colors.i}">[${time}] ${msg}</div>`+el.innerHTML;
+  // Auto-open after content is added, not before
   if(!feedOpen && pipelineRunning){
     feedOpen=true;
     el.style.display='block';
     const btn=document.getElementById('feed-toggle-btn');
     if(btn) btn.textContent='◀ FEED';
   }
-  const colors={s:'#00FF88',w:'#FFAA00',e:'#FF3355',i:'#4AB3FF'};
-  const time=new Date().toTimeString().slice(0,8);
-  el.innerHTML=`<div class="pml-line" style="color:${colors[type]||colors.i}">[${time}] ${msg}</div>`+el.innerHTML;
   // Keep last 100 lines across all sessions
   const lines=el.querySelectorAll('.pml-line');
   if(lines.length>100)lines[lines.length-1].remove();
