@@ -1494,6 +1494,18 @@ async function confirmActivation(){
   const expectedResponses = Math.round(sent * (STATE.conversionRate/100) * 10)/10;
   const projectedRevenue = Math.round(expectedResponses * STATE.websitePrice);
 
+  // Update lifetime stats
+  STATE.lifetime.leads += STATE.leads.length;
+  STATE.lifetime.built += STATE.forgeQueue.filter(i=>i.status==='saved').length;
+  STATE.lifetime.live += STATE.launchQueue.filter(i=>i.status==='live').length;
+  STATE.lifetime.sent += sent;
+  localStorage.setItem('galaxy_lt_leads', STATE.lifetime.leads);
+  localStorage.setItem('galaxy_lt_built', STATE.lifetime.built);
+  localStorage.setItem('galaxy_lt_live', STATE.lifetime.live);
+  localStorage.setItem('galaxy_lt_sent', STATE.lifetime.sent);
+  localStorage.setItem('galaxy_lt_sales', STATE.lifetime.sales);
+  localStorage.setItem('galaxy_lt_revenue', STATE.lifetime.revenue);
+
   // Save session summary
   const sessionSummary = {
     timestamp: new Date().toISOString(),
@@ -2152,6 +2164,16 @@ STATE.sessionLog = []; // stores completed session summaries
 STATE.sessionStart = null; // timestamp when session starts
 STATE.conversionRate = parseFloat(localStorage.getItem('galaxy_conversion_rate'))||0.3;
 STATE.websitePrice = parseFloat(localStorage.getItem('galaxy_website_price'))||300;
+
+// Lifetime stats — persisted in localStorage
+STATE.lifetime = {
+  leads: parseInt(localStorage.getItem('galaxy_lt_leads'))||0,
+  built: parseInt(localStorage.getItem('galaxy_lt_built'))||0,
+  live: parseInt(localStorage.getItem('galaxy_lt_live'))||0,
+  sent: parseInt(localStorage.getItem('galaxy_lt_sent'))||0,
+  sales: parseInt(localStorage.getItem('galaxy_lt_sales'))||0,
+  revenue: parseFloat(localStorage.getItem('galaxy_lt_revenue'))||0
+};
 
 function toggleSentinelCredits(){
   STATE.sentinelCreditsOn = !STATE.sentinelCreditsOn;
@@ -3174,11 +3196,47 @@ function renderSAMPanel(){
   const replies = STATE.samReplies || [];
   const newReplies = replies.filter(r=>!r.seen);
   return `
+  <!-- Current session stats -->
   <div class="p-stats">
     <div class="p-stat"><span class="v" style="color:var(--sam)">${STATE.leads.length}</span><span class="l">LEADS</span></div>
     <div class="p-stat"><span class="v" style="color:var(--green)">${STATE.sentLog.length}</span><span class="l">CONTACTED</span></div>
     <div class="p-stat"><span class="v" style="color:${newReplies.length?'#FF3355':'var(--gold)'}">${replies.length}</span><span class="l">REPLIES</span></div>
     <div class="p-stat"><span class="v" style="color:var(--green)">${STATE.leads.filter(l=>l.lead_temp==='HOT').length}</span><span class="l">HOT</span></div>
+  </div>
+
+  <!-- Lifetime stats -->
+  <div style="background:rgba(155,89,182,0.05);border:1px solid rgba(155,89,182,0.2);border-radius:8px;padding:12px;margin-bottom:12px">
+    <div style="font-size:7px;letter-spacing:3px;color:rgba(155,89,182,0.7);margin-bottom:10px">📊 SYSTEM LIFETIME STATS</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="text-align:center">
+        <div style="font-size:16px;color:#00B4D8;font-family:'Share Tech Mono',monospace">${STATE.lifetime.leads}</div>
+        <div style="font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px">LEADS</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:16px;color:#FF6464;font-family:'Share Tech Mono',monospace">${STATE.lifetime.built}</div>
+        <div style="font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px">BUILT</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:16px;color:#00FF88;font-family:'Share Tech Mono',monospace">${STATE.lifetime.live}</div>
+        <div style="font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px">LIVE</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:16px;color:#FFAA00;font-family:'Share Tech Mono',monospace">${STATE.lifetime.sent}</div>
+        <div style="font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px">SENT</div>
+      </div>
+    </div>
+    <div style="border-top:1px solid rgba(155,89,182,0.15);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="text-align:center">
+        <div style="font-size:20px;color:#00FF88;font-family:'Share Tech Mono',monospace">${STATE.lifetime.sales}</div>
+        <div style="font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px">SALES CLOSED</div>
+        <button onclick="samAddSale()" style="margin-top:6px;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);border-radius:3px;color:#00FF88;font-size:7px;padding:3px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace;letter-spacing:1px">+ LOG SALE</button>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:20px;color:#00FF88;font-family:'Share Tech Mono',monospace">£${STATE.lifetime.revenue.toLocaleString()}</div>
+        <div style="font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px">REVENUE GENERATED</div>
+        <div style="font-size:7px;color:rgba(192,200,216,0.3);margin-top:4px">@ £${STATE.websitePrice||300}/site</div>
+      </div>
+    </div>
   </div>
 
   <!-- Reply monitor -->
@@ -3221,6 +3279,18 @@ function renderSAMPanel(){
     </div>
   </div>
   <div class="p-log" id="log-SAM"></div>`;
+}
+
+// ── SAM FUNCTIONS ────────────────────────────
+
+function samAddSale(){
+  const price = STATE.websitePrice || 300;
+  STATE.lifetime.sales++;
+  STATE.lifetime.revenue += price;
+  localStorage.setItem('galaxy_lt_sales', STATE.lifetime.sales);
+  localStorage.setItem('galaxy_lt_revenue', STATE.lifetime.revenue);
+  addLog('SAM',`💰 Sale logged! £${price} — Total revenue: £${STATE.lifetime.revenue.toLocaleString()}`,'s');
+  if(currentAgent?.id==='SAM') renderAgentPanel('SAM');
 }
 
 // ── SAM REPLY FUNCTIONS ──────────────────────
