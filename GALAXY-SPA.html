@@ -1195,6 +1195,15 @@ async function runTestPipeline(){
     html=buildSiteHTML(testLead);
     pipelineLog(`🔴 FORGE — fell back to template: ${e.message}`,'w');
   }
+  // Push to forgeQueue so FORGE panel shows the build
+  const forgeRow = await sbInsert('forge_output',{business_name:testLead.name,html,status:'saved'}).catch(()=>null);
+  STATE.forgeQueue.push({
+    ...testLead,
+    status:'saved',
+    html,
+    forge_id:forgeRow?.id,
+    is_demo:true
+  });
   STATE.stats.built=1;
   updateBottomBar();
   setNodeStatus('FORGE','DONE');
@@ -1220,6 +1229,7 @@ async function runTestPipeline(){
     liveUrl=`https://${GITHUB_USER}.github.io/${repo}/`;
     pipelineLog(`🟢 LAUNCH — live at ${liveUrl}`,'s');
     STATE.stats.live=1;
+    STATE.launchQueue.push({...testLead, status:'live', live_url:liveUrl, is_demo:true});
     updateBottomBar();
   }catch(e){
     pipelineLog(`🟢 LAUNCH failed: ${e.message}`,'e');
@@ -1234,6 +1244,20 @@ async function runTestPipeline(){
   setNodeStatus('SCANNER','RUNNING');
   await new Promise(r=>setTimeout(r,1000));
   pipelineLog('🟤 SCANNER — test site approved ✅','s');
+  STATE.scannerQueue.push({
+    business_name:testLead.name,
+    live_url:liveUrl,
+    status:'approved',
+    checks:{name:true,loads:true,niche:true,contact:true},
+    is_demo:true
+  });
+  STATE.scannerIntel=[{
+    name:testLead.name,
+    detected_niche:'restaurant',
+    template:'Restaurant',
+    phone:testLead.phone,
+    email:demoEmail
+  }];
   setNodeStatus('SCANNER','DONE');
 
   if(pipelineStopped) return cleanup();
@@ -1255,9 +1279,10 @@ async function runTestPipeline(){
       live_url:liveUrl
     });
     if(d.ok){
+      STATE.sentLog.push({business_name:testLead.name,to:demoEmail,live_url:liveUrl,is_demo:true});
+      STATE.dispatchQueue.push({business_name:testLead.name,email:demoEmail,live_url:liveUrl,is_demo:true});
+      STATE.stats.sent=1;updateBottomBar();
       pipelineLog(`🟠 DISPATCH — test email dispatched to ${demoEmail} ✅`,'s');
-      STATE.stats.sent=1;
-      updateBottomBar();
     } else {
       pipelineLog(`🟠 DISPATCH error: ${JSON.stringify(d.error)}`,'e');
     }
@@ -1266,8 +1291,12 @@ async function runTestPipeline(){
   }
   setNodeStatus('DISPATCH','DONE');
 
-  pipelineLog('🧪 TEST COMPLETE — check your inbox','s');
+  pipelineLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━','s');
+  pipelineLog('🏁 TEST COMPLETE — check your inbox','s');
+  pipelineLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━','s');
   addLog('SAM','Test pipeline complete — check inbox for test email','s');
+  const tp=document.getElementById('pipeline-pill');
+  if(tp){ tp.textContent='✅ TEST COMPLETE — tap to view log'; tp.style.borderColor='rgba(0,255,136,0.35)'; }
 
   cleanup();
 }
@@ -1282,7 +1311,7 @@ function cleanup(){
     hidePipelineToast();
     activationModal.style.display='none';
     const pill=document.getElementById('pipeline-pill');
-    if(pill){ pill.textContent='🧪 TEST COMPLETE — tap to view log'; }
+    if(pill){ pill.style.display='none'; }
     const check=document.getElementById('single-demo-check');
     const note=document.getElementById('single-demo-note');
     const wrap=document.getElementById('single-demo-wrap');
@@ -2909,7 +2938,7 @@ function renderForgePanel(){
     <div style="overflow-x:auto;max-height:180px;overflow-y:auto">
       <table class="p-table">
         <thead><tr><th>Business</th><th>Status</th><th>Preview</th></tr></thead>
-        <tbody>${q.length?q.slice(0,15).map((i,idx)=>`<tr><td style="color:#fff">${i.name||i.business_name||'—'}</td><td><span class="badge ${i.status==='saved'?'ok':i.status==='failed'?'fail':'pend'}">${i.status?.toUpperCase()||'—'}</span></td><td>${i.status==='saved'?`<button ontouchstart="previewSite(${idx})" onclick="previewSite(${idx})" style="background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:3px;color:#00B4D8;font-size:8px;padding:2px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace;touch-action:manipulation">👁 VIEW</button>`:'—'}</td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO BUILDS YET</div></td></tr>'}</tbody>
+        <tbody>${q.length?q.slice(0,15).map((i,idx)=>`<tr><td style="color:#fff">${i.name||i.business_name||'—'}${i.is_demo?'<span style="font-size:6px;padding:1px 4px;border-radius:2px;background:rgba(0,255,136,0.15);color:#00FF88;margin-left:4px;letter-spacing:1px">DEMO</span>':''}</td><td><span class="badge ${i.status==='saved'?'ok':i.status==='failed'?'fail':'pend'}">${i.status?.toUpperCase()||'—'}</span></td><td>${i.status==='saved'?`<button ontouchstart="previewSite(${idx})" onclick="previewSite(${idx})" style="background:transparent;border:1px solid rgba(0,180,216,0.3);border-radius:3px;color:#00B4D8;font-size:8px;padding:2px 8px;cursor:pointer;font-family:'Share Tech Mono',monospace;touch-action:manipulation">👁 VIEW</button>`:'—'}</td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO BUILDS YET</div></td></tr>'}</tbody>
       </table>
     </div>
   </div>`;
@@ -3087,7 +3116,7 @@ function renderDispatchPanel(){
     <div style="overflow-x:auto;max-height:150px;overflow-y:auto">
       <table class="p-table">
         <thead><tr><th>Business</th><th>Email</th><th>Status</th></tr></thead>
-        <tbody>${STATE.sentLog.length?STATE.sentLog.slice(0,15).map(i=>`<tr><td style="color:#fff">${i.business_name||'—'}</td><td style="font-size:8px">${i.to||'—'}</td><td><span class="badge ok">DISPATCHED</span></td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO SENDS YET</div></td></tr>'}</tbody>
+        <tbody>${STATE.sentLog.length?STATE.sentLog.slice(0,15).map(i=>`<tr><td style="color:#fff">${i.business_name||'—'}${i.is_demo?'<span style="font-size:6px;padding:1px 4px;border-radius:2px;background:rgba(0,255,136,0.15);color:#00FF88;margin-left:4px;letter-spacing:1px">DEMO</span>':''}</td><td style="font-size:8px">${i.to||'—'}</td><td><span class="badge ok">DISPATCHED</span></td></tr>`).join(''):'<tr><td colspan="3"><div class="p-empty">⬡ NO SENDS YET</div></td></tr>'}</tbody>
       </table>
     </div>
   </div>`;
