@@ -14,7 +14,7 @@
   --gold:#FFD700;--green:#00FF88;--red:#FF3355;--amber:#FFAA00;
   --bg:#010208;--panel:rgba(6,10,24,0.96);--border:rgba(74,179,255,0.15);--silver:#C0C8D8;
 }
-html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--silver)}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--silver);-webkit-user-select:none;user-select:none}
 
 /* PIPELINE TOAST */
 /* CREDITS PANEL — responsive */
@@ -104,6 +104,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
   pointer-events:all;
   max-height:160px;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:rgba(0,180,216,0.4) transparent;
 }
+#pipeline-mini-log:empty{display:none !important}
 #pipeline-mini-log.visible{display:block}
 .pml-line{padding:1px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
 
@@ -820,35 +821,9 @@ function initGalaxyHold(){
     hideHoldRing();
   }
 
-  let touchStartTime=0;
-  galaxyNode.addEventListener('touchstart',e=>{
-    e.stopPropagation();
-    touchStartTime=Date.now();
-    const t=e.touches[0];
-    startHold(t.clientX,t.clientY);
-  },{passive:true});
-  galaxyNode.addEventListener('touchend',e=>{
-    e.stopPropagation();
-    const elapsed=Date.now()-touchStartTime;
-    cancelHold();
-    // Short tap (<400ms) = open GALAXY panel
-    if(elapsed<400){
-      openPanel('GALAXY');
-    }
-    // Long hold (>=400ms) handled by holdInterval firing activatePipeline
-  },{passive:true});
-  galaxyNode.addEventListener('touchcancel',e=>{e.stopPropagation();cancelHold()},{passive:true});
-  galaxyNode.addEventListener('mousedown',e=>{e.stopPropagation();startHold(e.clientX,e.clientY)});
-  galaxyNode.addEventListener('mouseup',e=>{
-    e.stopPropagation();
-    cancelHold();
-  });
-  galaxyNode.addEventListener('mouseleave',e=>{cancelHold()});
-  // Desktop click = open panel
-  galaxyNode.onclick=(e)=>{
-    e.stopPropagation();
-    openPanel('GALAXY');
-  };
+  // GALAXY node — simple tap like all other agents
+  galaxyNode.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();openPanel('GALAXY');},{passive:false});
+  galaxyNode.onclick=(e)=>{e.stopPropagation();openPanel('GALAXY');};
 }
 
 // ACTIVATION MODAL
