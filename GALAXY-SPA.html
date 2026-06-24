@@ -93,18 +93,17 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 
 /* PIPELINE MINI LOG */
 #pipeline-mini-log{
-  position:fixed;bottom:104px;left:12px;
-  z-index:150;width:calc(100% - 110px);max-width:300px;
+  position:fixed;bottom:80px;left:16px;
+  z-index:150;width:calc(100% - 80px);max-width:340px;
   background:rgba(6,10,24,0.95);
   border:1px solid rgba(0,180,216,0.15);
   border-radius:8px;
-  padding:8px 10px;
-  font-size:7.5px;
+  padding:10px 12px;
+  font-size:8px;
   display:none;
   pointer-events:all;
-  max-height:160px;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:rgba(0,180,216,0.4) transparent;
+  max-height:200px;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:rgba(0,180,216,0.4) transparent;
 }
-#pipeline-mini-log:empty{display:none !important}
 #pipeline-mini-log.visible{display:block}
 .pml-line{padding:1px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
 
@@ -335,7 +334,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 
 <!-- SETTINGS BUTTON -->
 <div id="settings-btn" ontouchstart="event.preventDefault();openSettings()" onclick="openSettings()" style="position:fixed;bottom:72px;right:12px;z-index:500;background:rgba(0,180,216,0.12);border:1px solid rgba(0,180,216,0.35);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:8px;padding:4px 8px;cursor:pointer;letter-spacing:1px;user-select:none;-webkit-user-select:none;touch-action:manipulation">⚙ SETTINGS</div>
-<div id="feed-toggle-btn" ontouchstart="event.preventDefault();toggleFeed()" onclick="toggleFeed()" style="position:fixed;bottom:72px;left:12px;z-index:500;background:rgba(0,180,216,0.12);border:1px solid rgba(0,180,216,0.35);border-radius:6px;color:#00B4D8;font-family:'Share Tech Mono',monospace;font-size:8px;padding:4px 8px;cursor:pointer;letter-spacing:1px;user-select:none;-webkit-user-select:none;touch-action:manipulation">▶ FEED</div>
 
 <!-- SITE PREVIEW MODAL -->
 <div id="preview-modal" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(1,2,8,0.95);flex-direction:column">
@@ -821,9 +819,7 @@ function initGalaxyHold(){
     hideHoldRing();
   }
 
-  // GALAXY node — simple tap like all other agents
-  galaxyNode.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();openPanel('GALAXY');},{passive:false});
-  galaxyNode.onclick=(e)=>{e.stopPropagation();openPanel('GALAXY');};
+  // GALAXY handled by AGENTS forEach above
 }
 
 // ACTIVATION MODAL
@@ -1328,11 +1324,6 @@ async function runSingleSession(location, niche, sessionNum, totalSessions){
   updateBottomBar();
 
   showPipelineToast(`🧠 SESSION ${sessionNum}/${totalSessions} — ${location} / ${niche}`);
-  // Add session divider to mini log without clearing previous session
-  const miniEl=document.getElementById('pipeline-mini-log');
-  if(miniEl&&sessionNum>1){
-    miniEl.innerHTML=`<div class="pml-line" style="color:#FFAA00;border-bottom:1px solid rgba(255,170,0,0.3);padding:3px 0;letter-spacing:2px">── SESSION ${sessionNum} — ${location.toUpperCase()} / ${niche.toUpperCase()} ──</div>`+miniEl.innerHTML;
-  }
   pipelineLog(`🧠 SESSION ${sessionNum}/${totalSessions} — ${location} / ${niche}`,'s');
 
   // ── STAGE 1: SCOUT ──
@@ -2113,32 +2104,15 @@ function showPipelineToast(msg){
 function hidePipelineToast(){
   document.getElementById('pipeline-toast').classList.remove('visible');
 }
-let feedOpen = false;
-
-function toggleFeed(){
-  feedOpen = !feedOpen;
-  const el=document.getElementById('pipeline-mini-log');
-  const btn=document.getElementById('feed-toggle-btn');
-  el.style.display = feedOpen ? 'block' : 'none';
-  if(btn) btn.textContent = feedOpen ? '◀ FEED' : '▶ FEED';
-}
-
 function updateMiniLog(msg,type='i'){
   const el=document.getElementById('pipeline-mini-log');
-  // Auto-open feed when pipeline starts if not manually closed
+  if(!el) return;
+  el.classList.add('visible');
   const colors={s:'#00FF88',w:'#FFAA00',e:'#FF3355',i:'#4AB3FF'};
   const time=new Date().toTimeString().slice(0,8);
   el.innerHTML=`<div class="pml-line" style="color:${colors[type]||colors.i}">[${time}] ${msg}</div>`+el.innerHTML;
-  // Auto-open after content is added, not before
-  if(!feedOpen && pipelineRunning){
-    feedOpen=true;
-    el.style.display='block';
-    const btn=document.getElementById('feed-toggle-btn');
-    if(btn) btn.textContent='◀ FEED';
-  }
-  // Keep last 100 lines across all sessions
   const lines=el.querySelectorAll('.pml-line');
-  if(lines.length>100)lines[lines.length-1].remove();
+  if(lines.length>50)lines[lines.length-1].remove();
 }
 
 // ═══════════════════════════════════════════
