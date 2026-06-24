@@ -1957,7 +1957,7 @@ async function runScoutForPipeline(location, niche){
       if(i%5===0)pipelineLog(`SCOUT: ${i+1}/${businesses.length} processed — ${STATE.leads.length} leads`,'i');
       // Single demo — stop after first lead found
       if(singleDemoMode && STATE.leads.length>=1) break;
-      await new Promise(r=>setTimeout(r,200));
+      await new Promise(r=>setTimeout(r,0));
     }
     STATE.stats.leads=STATE.leads.length;updateBottomBar();
     setNodeStatus('SCOUT','DONE');
@@ -2044,7 +2044,7 @@ async function runForgeForPipeline(){
         STATE.stats.built++;updateBottomBar();
         pipelineLog(`FORGE: Built ${item.name}`,'s');
       }catch(e){item.status='failed';pipelineLog(`FORGE: Failed ${item.name} — ${e.message}`,'e')}
-      await new Promise(r=>setTimeout(r,200));
+      await new Promise(r=>setTimeout(r,0));
     }
     setNodeStatus('FORGE','DONE');
   }catch(e){pipelineLog(`FORGE error: ${e.message}`,'e')}
@@ -2853,15 +2853,68 @@ function renderGalaxyPanel(){
   const rate = STATE.conversionRate||0.3;
   const price = STATE.websitePrice||300;
   const sent = STATE.sentLog.length;
-  const liveExpected = Math.round(sent*(rate/100)*10)/10;
-  const liveRevenue = Math.round(liveExpected*price);
+  const lt = STATE.lifetime||{leads:0,built:0,live:0,sent:0,sales:0,revenue:0};
+  const replies = (STATE.samReplies||[]).length;
+  const replyRate = lt.sent>0 ? Math.round((replies/lt.sent)*1000)/10 : 0;
+  const convRate = replies>0 ? Math.round((lt.sales/replies)*1000)/10 : 0;
+
+  // Best niche from session log
+  const nicheCount={};
+  (STATE.sessionLog||[]).forEach(s=>{ if(s.sessions){ s.sessions.split(',').forEach(area=>{ const n=area.trim().split('/')[1]?.trim(); if(n) nicheCount[n]=(nicheCount[n]||0)+1; }); } });
+  const bestNiche = Object.entries(nicheCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||'—';
 
   return `
+  <!-- Session stats -->
   <div class="p-stats">
     <div class="p-stat"><span class="v" style="color:var(--gold)">${STATE.leads.length}</span><span class="l">LEADS</span></div>
     <div class="p-stat"><span class="v" style="color:var(--forge)">${STATE.forgeQueue.filter(i=>i.status==='saved').length}</span><span class="l">BUILT</span></div>
     <div class="p-stat"><span class="v" style="color:var(--launch)">${STATE.launchQueue.filter(i=>i.status==='live').length}</span><span class="l">LIVE</span></div>
     <div class="p-stat"><span class="v" style="color:var(--dispatch)">${sent}</span><span class="l">SENT</span></div>
+  </div>
+
+  <!-- MISSION CONTROL -->
+  <div style="background:rgba(200,150,62,0.05);border:1px solid rgba(200,150,62,0.2);border-radius:8px;padding:12px;margin-bottom:12px">
+    <div style="font-size:7px;letter-spacing:3px;color:rgba(200,150,62,0.8);margin-bottom:12px">🧠 MISSION CONTROL</div>
+
+    <!-- Performance row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="text-align:center;background:rgba(0,0,0,0.2);border-radius:4px;padding:8px">
+        <div style="font-size:18px;color:#FFAA00;font-family:'Share Tech Mono',monospace">${lt.sent}</div>
+        <div style="font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px">EMAILS SENT</div>
+      </div>
+      <div style="text-align:center;background:rgba(0,0,0,0.2);border-radius:4px;padding:8px">
+        <div style="font-size:18px;color:#FF3355;font-family:'Share Tech Mono',monospace">${replies}</div>
+        <div style="font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px">REPLIES</div>
+      </div>
+      <div style="text-align:center;background:rgba(0,0,0,0.2);border-radius:4px;padding:8px">
+        <div style="font-size:18px;color:#00FF88;font-family:'Share Tech Mono',monospace">${lt.sales}</div>
+        <div style="font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px">CONVERSIONS</div>
+      </div>
+    </div>
+
+    <!-- Rate row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="background:rgba(0,0,0,0.2);border-radius:4px;padding:8px;text-align:center">
+        <div style="font-size:16px;color:#00B4D8;font-family:'Share Tech Mono',monospace">${replyRate}%</div>
+        <div style="font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px">REPLY RATE</div>
+      </div>
+      <div style="background:rgba(0,0,0,0.2);border-radius:4px;padding:8px;text-align:center">
+        <div style="font-size:16px;color:#9B59B6;font-family:'Share Tech Mono',monospace">${convRate}%</div>
+        <div style="font-size:6px;letter-spacing:1px;color:rgba(192,200,216,0.4);margin-top:2px">CONV RATE</div>
+      </div>
+    </div>
+
+    <!-- Intelligence row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid rgba(200,150,62,0.1);padding-top:10px">
+      <div style="background:rgba(0,255,136,0.05);border-radius:4px;padding:8px">
+        <div style="font-size:6px;letter-spacing:2px;color:rgba(0,255,136,0.5);margin-bottom:4px">TOP NICHE</div>
+        <div style="font-size:11px;color:#00FF88;font-family:'Share Tech Mono',monospace;text-transform:uppercase">${bestNiche}</div>
+      </div>
+      <div style="background:rgba(255,51,85,0.05);border-radius:4px;padding:8px">
+        <div style="font-size:6px;letter-spacing:2px;color:rgba(255,51,85,0.5);margin-bottom:4px">REVENUE</div>
+        <div style="font-size:11px;color:#00FF88;font-family:'Share Tech Mono',monospace">£${lt.revenue.toLocaleString()}</div>
+      </div>
+    </div>
   </div>
 
   ${lastSession ? `
@@ -4194,7 +4247,7 @@ async function runScannerPhase1(){
     }
 
     if(currentAgent?.id==='SCANNER')renderAgentPanel('SCANNER');
-    await new Promise(r=>setTimeout(r,600));
+    await new Promise(r=>setTimeout(r,300));
   }
 
   addLog('SCANNER',`Phase 1 complete — ${STATE.leads.length} leads enriched with verified niches`,'s');
