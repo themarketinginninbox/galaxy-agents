@@ -796,29 +796,6 @@ function hideHoldRing(){
 
 // Add hold detection to GALAXY node
 function initGalaxyHold(){
-  const galaxyNode=nodeEls['GALAXY'];
-  if(!galaxyNode)return;
-  let holdX=0,holdY=0,holdProgress=0,holdInterval=null;
-
-  function startHold(x,y){
-    if(pipelineRunning)return;
-    holdX=x;holdY=y;holdProgress=0;
-    holdInterval=setInterval(()=>{
-      holdProgress+=0.033; // fills in ~1 second
-      showHoldProgress(holdX,holdY,Math.min(holdProgress,1));
-      if(holdProgress>=1){
-        clearInterval(holdInterval);
-        hideHoldRing();
-        activatePipeline();
-      }
-    },33);
-  }
-  function cancelHold(){
-    clearInterval(holdInterval);
-    holdInterval=null;
-    hideHoldRing();
-  }
-
   // GALAXY handled by AGENTS forEach above
 }
 
