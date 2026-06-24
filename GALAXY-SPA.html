@@ -574,6 +574,7 @@ function getNetlifyToken(){return STATE.netlifyToken||localStorage.getItem('gala
 // AGENT CONFIG
 // ═══════════════════════════════════════════
 const AGENTS = [
+  {id:'GALAXY',gem:'🧠',gemColor:'#00B4D8',role:'Master Brain — Orchestrates All Agents',level:'brain'},
   {id:'SCOUT', gem:'🔵',gemColor:'#4AB3FF',role:'Worker — Lead Sourcing Engine'},
   {id:'FORGE', gem:'🔴',gemColor:'#FF3355',role:'Worker — Website Builder'},
   {id:'LAUNCH',gem:'🟢',gemColor:'#00FF88',role:'Worker — GitHub Pages Deployer'},
@@ -700,6 +701,11 @@ AGENTS.forEach(a=>{
   nodeEls[a.id].addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
   nodeEls[a.id].addEventListener('mousedown',e=>e.stopPropagation());
 });
+// GALAXY centre node — visual only, no tap action
+if(nodeEls['GALAXY']){
+  nodeEls['GALAXY'].onclick=(e)=>{e.stopPropagation();};
+  nodeEls['GALAXY'].style.cursor='default';
+}
 
 // DRAG HINT
 const dragHint=document.createElement('div');
